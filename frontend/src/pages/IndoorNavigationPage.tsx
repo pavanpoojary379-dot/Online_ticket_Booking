@@ -575,6 +575,26 @@ export const IndoorNavigationPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Task 8: Live Navigation Coordinate & Movement Debugger */}
+        <div className="w-full max-w-4xl bg-slate-950/80 border border-sky-500/30 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono shadow-md">
+          <div className="flex items-center space-x-2 text-slate-300">
+            <span className="flex items-center gap-1.5 text-sky-400 font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+              NAV DEBUGGER:
+            </span>
+            <span>Coords: <b className="text-white">({currentCoords.x.toFixed(1)}, {currentCoords.y.toFixed(1)})</b></span>
+            <span className="text-slate-600">|</span>
+            <span>Stage: <b className="text-orange-400">{navigationState}</b></span>
+            <span className="text-slate-600">|</span>
+            <span>Zone: <b className="text-emerald-400">{currentLocationDescription}</b></span>
+          </div>
+          <div className="flex items-center space-x-2 text-slate-400">
+            <span>Target: <b className="text-yellow-300">{currentSeat ? `Seat ${currentSeat.label} (${currentSeat.x}, ${currentSeat.y})` : 'None'}</b></span>
+            <span className="text-slate-600">|</span>
+            <span>Mode: <b className="text-sky-300">Simulation</b></span>
+          </div>
+        </div>
+
         {/* Interactive Cinema Blueprint Map */}
         <IndoorTheatreBlueprint
           screenMap={screenMap}

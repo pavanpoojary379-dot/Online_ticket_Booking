@@ -1,7 +1,5 @@
-// Test suite for SimulationLocationProvider movements, collisions, and state
-import { readFileSync } from 'fs';
+// Comprehensive Test Suite for SimulationLocationProvider (Task 10 Journey: Entrance -> Central Aisle -> Near Row D -> Inside Row D -> Seat D4)
 
-// Simple lightweight mock of the class to test logic directly
 class SimulationLocationProviderTest {
   constructor(initialX = 50.0, initialY = 95.0, rowPositions = [24.0, 35.6, 47.2, 58.8, 70.4, 82.0]) {
     this.currentX = initialX;
@@ -26,7 +24,7 @@ class SimulationLocationProviderTest {
 
   setPosition(x, y) {
     const clampedX = Math.max(4.0, Math.min(96.0, x));
-    const clampedY = Math.max(10.0, Math.min(97.0, y));
+    const clampedY = Math.max(8.0, Math.min(96.0, y));
     this.currentX = Math.round(clampedX * 10) / 10;
     this.currentY = Math.round(clampedY * 10) / 10;
   }
@@ -35,191 +33,173 @@ class SimulationLocationProviderTest {
     this.setPosition(entranceX, entranceY);
   }
 
+  isInAisle(x, y) {
+    if (y >= 84.0) return true; // Rear concourse
+    if (y <= 22.0) return true; // Front concourse
+    if (x >= 38.0 && x <= 62.0) return true; // Central Aisle
+    if (x <= 16.0) return true; // Left Side Aisle
+    if (x >= 84.0) return true; // Right Side Aisle
+    return false;
+  }
+
+  getClosestRow(y, maxDistance = 6.0) {
+    let bestRow;
+    let minD = maxDistance;
+    for (const ry of this.rowPositions) {
+      const d = Math.abs(y - ry);
+      if (d <= minD) {
+        minD = d;
+        bestRow = ry;
+      }
+    }
+    return bestRow;
+  }
+
   moveDirection(direction, step = 2.5) {
     let nextX = this.currentX;
     let nextY = this.currentY;
 
-    switch (direction) {
-      case 'UP':
-        nextY -= step;
-        break;
-      case 'DOWN':
-        nextY += step;
-        break;
-      case 'LEFT':
-        nextX -= step;
-        break;
-      case 'RIGHT':
-        nextX += step;
-        break;
-    }
-
-    // When turning from central or side aisles into a row walkway, snap Y to row centerline
-    if (Math.abs(this.currentX - 50.0) <= 8.0 && Math.abs(nextX - 50.0) > 8.0) {
-      const closestRow = this.rowPositions.find((ry) => Math.abs(this.currentY - ry) <= 3.8);
-      if (closestRow !== undefined) {
-        nextY = closestRow;
+    if (direction === 'UP') {
+      if (this.currentY <= 8.0) {
+        const reason = 'Cinema screen reached. Please take your seat.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
-    }
-
-    const check = this.isValidMovement(this.currentX, this.currentY, nextX, nextY);
-
-    if (check.valid) {
-      this.setPosition(nextX, nextY);
-      return { moved: true, x: this.currentX, y: this.currentY };
-    } else {
-      const reason = check.reason || 'Movement blocked: Path obstructed by cinema seating or walls.';
-      if (this.onBlockedCallback) {
-        this.onBlockedCallback(reason);
+      if (!this.isInAisle(this.currentX, this.currentY)) {
+        const closestRow = this.getClosestRow(this.currentY, 3.5);
+        const reason = `Cannot step over seats. Please walk along the row back to the central aisle to change rows.`;
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
-      return { moved: false, x: this.currentX, y: this.currentY, reason };
-    }
-  }
-
-  isValidMovement(currX, currY, targetX, targetY) {
-    // 1. Boundary check: Cinema auditorium walls
-    if (targetX < 4.0 || targetX > 96.0 || targetY < 10.0 || targetY > 97.0) {
-      return { valid: false, reason: 'Auditorium wall reached. Movement outside boundaries is not allowed.' };
-    }
-
-    const inAisle = (x, y) => {
-      if (this.aisles && this.aisles.length > 0) {
-        const inConfiguredAisle = this.aisles.some((a) => {
-          if (a.type === 'VERTICAL') {
-            const w = (a.width || 8.0) + 2.0;
-            const ax = a.x !== undefined ? a.x : 50.0;
-            const y1 = a.y1 !== undefined ? a.y1 - 1.5 : 12.0;
-            const y2 = a.y2 !== undefined ? a.y2 + 2.0 : 97.0;
-            return Math.abs(x - ax) <= w / 2 && y >= y1 && y <= y2;
-          } else {
-            const h = (a.height || 6.0) + 2.0;
-            const ay = a.y !== undefined ? a.y : 88.0;
-            const x1 = a.x1 !== undefined ? a.x1 - 2.0 : 4.0;
-            const x2 = a.x2 !== undefined ? a.x2 + 2.0 : 96.0;
-            return Math.abs(y - ay) <= h / 2 && x >= x1 && x <= x2;
-          }
-        });
-        if (inConfiguredAisle) return true;
+      nextY = Math.max(8.0, Math.round((this.currentY - step) * 10) / 10);
+    } else if (direction === 'DOWN') {
+      if (this.currentY >= 96.0) {
+        const reason = 'Auditorium entrance reached. Turn around towards the cinema screen.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
-
-      const inCentralAisle = x >= 42.0 && x <= 58.0;
-      const inLeftAisle = x >= 4.0 && x <= 14.0;
-      const inRightAisle = x >= 86.0 && x <= 96.0;
-      const inRearAisle = y >= 84.0 && y <= 97.0;
-      const inFrontAisle = y >= 10.0 && y <= 22.0;
-      return inCentralAisle || inLeftAisle || inRightAisle || inRearAisle || inFrontAisle;
-    };
-
-    const isNearRowLane = (y) => {
-      return this.rowPositions.some((rowY) => Math.abs(y - rowY) <= 3.8);
-    };
-
-    const isVerticalMove = Math.abs(targetY - currY) > 0.4;
-
-    if (isVerticalMove) {
-      if (!inAisle(currX, currY) && !inAisle(targetX, targetY)) {
-        return {
-          valid: false,
-          reason: 'Cannot step over seats. Please walk along your row back to the central or side aisle to change rows.',
-        };
+      if (!this.isInAisle(this.currentX, this.currentY)) {
+        const reason = `Cannot step over seats. Please walk along the row back to the central aisle to change rows.`;
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
+      nextY = Math.min(96.0, Math.round((this.currentY + step) * 10) / 10);
+    } else if (direction === 'LEFT') {
+      if (this.currentX <= 4.0) {
+        const reason = 'Auditorium left wall reached.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      if (Math.abs(this.currentX - 50.0) <= 8.0 && this.currentY > 22.0 && this.currentY < 84.0) {
+        const closest = this.getClosestRow(this.currentY, 6.0);
+        if (closest !== undefined) {
+          nextY = closest;
+        }
+      }
+      nextX = Math.max(4.0, Math.round((this.currentX - step) * 10) / 10);
+    } else if (direction === 'RIGHT') {
+      if (this.currentX >= 96.0) {
+        const reason = 'Auditorium right wall reached.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      if (Math.abs(this.currentX - 50.0) <= 8.0 && this.currentY > 22.0 && this.currentY < 84.0) {
+        const closest = this.getClosestRow(this.currentY, 6.0);
+        if (closest !== undefined) {
+          nextY = closest;
+        }
+      }
+      nextX = Math.min(96.0, Math.round((this.currentX + step) * 10) / 10);
     }
 
-    if (!inAisle(targetX, targetY) && !isNearRowLane(targetY)) {
-      return {
-        valid: false,
-        reason: 'Obstruction: Please remain within marked auditorium aisles and row walkways.',
-      };
-    }
-
-    return { valid: true };
+    this.setPosition(nextX, nextY);
+    return { moved: true, x: this.currentX, y: this.currentY };
   }
 }
 
-console.log('==================================================');
-console.log('RUNNING SMART INDOOR SIMULATION MOVEMENT TEST SUITE');
-console.log('==================================================');
+console.log('======================================================================');
+console.log('RUNNING SMART INDOOR SEAT NAVIGATION FULL JOURNEY TEST SUITE');
+console.log('======================================================================');
 
 const provider = new SimulationLocationProviderTest(50.0, 95.0, [24.0, 35.6, 47.2, 58.8, 70.4, 82.0]);
 let lastBlockedReason = null;
 provider.onBlocked((msg) => { lastBlockedReason = msg; });
 
-// TEST 1: Initial position at entrance
-console.log(`Starting Position: (${provider.currentX}, ${provider.currentY})`);
-if (provider.currentX !== 50.0 || provider.currentY !== 95.0) throw new Error('Initial position mismatch');
-console.log('✓ Test 1 Passed: Initial position initialized at (50.0, 95.0)');
+// 1. Initial State: Entrance
+console.log(`\n--- Stage 1: Entrance ---`);
+console.log(`Marker Position: (${provider.currentX}, ${provider.currentY})`);
+if (provider.currentX !== 50.0 || provider.currentY !== 95.0) throw new Error('Initial position error');
+console.log('✓ Stage 1 Passed: Initialized at Entrance (50.0, 95.0)');
 
-// TEST 2: Move UP along central aisle
-const up1 = provider.moveDirection('UP', 2.5);
-console.log(`After UP: moved=${up1.moved}, pos=(${up1.x}, ${up1.y})`);
-if (!up1.moved || up1.y !== 92.5) throw new Error('Failed moving UP');
-console.log('✓ Test 2 Passed: Move UP forward along central aisle');
-
-// TEST 3: Move DOWN towards entrance
+// 2. Down Movement at Entrance
+console.log(`\n--- Testing Down & Boundary at Entrance ---`);
 const down1 = provider.moveDirection('DOWN', 2.5);
 console.log(`After DOWN: moved=${down1.moved}, pos=(${down1.x}, ${down1.y})`);
-if (!down1.moved || down1.y !== 95.0) throw new Error('Failed moving DOWN');
-console.log('✓ Test 3 Passed: Move DOWN backward along aisle');
+if (!down1.moved || down1.y !== 96.0) throw new Error('Should move down to 96.0');
+const down2 = provider.moveDirection('DOWN', 2.5);
+console.log(`At Rear Wall: moved=${down2.moved}, reason="${down2.reason}"`);
+if (down2.moved) throw new Error('Should block at rear boundary');
+console.log('✓ Stage 2 Passed: Down movement and rear boundary check validated');
 
-// TEST 4: Boundary check - try to walk beyond rear wall
-provider.moveDirection('DOWN', 2.5); // to 97.5 (blocked)
-if (lastBlockedReason === null || !lastBlockedReason.includes('wall reached')) {
-  throw new Error('Wall boundary check failed');
-}
-console.log(`✓ Test 4 Passed: Wall collision detected -> "${lastBlockedReason}"`);
-
-// TEST 5: Walk along central aisle to near Row F (Y = 82.0)
+// 3. Move along Central Aisle towards Row D (Y: 58.8)
+console.log(`\n--- Stage 3: Central Aisle Movement Towards Row D ---`);
 provider.resetToEntrance();
-// Move up several steps to Y = 82.5
-for (let i = 0; i < 5; i++) {
-  provider.moveDirection('UP', 2.5);
+// Move up 14 steps towards Row D
+for (let i = 0; i < 14; i++) {
+  const res = provider.moveDirection('UP', 2.5);
+  if (!res.moved) throw new Error(`Failed to move UP at step ${i}`);
 }
-console.log(`Arrived near Row F at Y=${provider.currentY}`);
-console.log('✓ Test 5 Passed: Navigated along central aisle towards Row F');
+console.log(`Near Row D: Position=(${provider.currentX}, ${provider.currentY})`);
+// Y should be 60.0 (near Row D at 58.8, diff 1.2 <= 7.5 threshold for APPROACHING_ROW)
+if (Math.abs(provider.currentY - 58.8) > 3.0) throw new Error(`Expected near Row D, got Y=${provider.currentY}`);
+console.log('✓ Stage 3 Passed: Approaching Row D detected along Central Aisle');
 
-// TEST 6: Turn LEFT into Row F lane
-// Current: (50.0, 82.5). Turn left into Row F (82.0).
-const left1 = provider.moveDirection('LEFT', 2.5);
-console.log(`Turned LEFT into Row F: moved=${left1.moved}, pos=(${left1.x}, ${left1.y})`);
-if (!left1.moved) throw new Error('Failed to turn into row lane');
-console.log('✓ Test 6 Passed: Turned LEFT into Row F walkway with automatic Y alignment');
+// 4. Turn LEFT into Row D Seating Lane
+console.log(`\n--- Stage 4: Enter Row D Seating Lane ---`);
+const turnLeft = provider.moveDirection('LEFT', 2.5);
+console.log(`Turned LEFT into Row D: moved=${turnLeft.moved}, pos=(${turnLeft.x}, ${turnLeft.y})`);
+if (!turnLeft.moved || turnLeft.y !== 58.8) throw new Error('Failed to align into Row D');
+console.log('✓ Stage 4 Passed: Entered Row D with automatic centerline snapping (Y = 58.8)');
 
-// TEST 7: Move further LEFT along Row F towards seats
+// 5. Navigate through Row D to Seat D4 (X: 35.0, Y: 58.8)
+console.log(`\n--- Stage 5: Move Along Row D to Seat D4 ---`);
+// Move left 5 more steps to reach Seat D4 (target X: 35.0)
 for (let i = 0; i < 5; i++) {
-  provider.moveDirection('LEFT', 2.5);
+  const res = provider.moveDirection('LEFT', 2.5);
+  if (!res.moved) throw new Error(`Failed to move left in row at step ${i}`);
 }
-console.log(`Deep in Row F at: (${provider.currentX}, ${provider.currentY})`);
-if (provider.currentX >= 42.0) throw new Error('Should be in seating area');
-console.log('✓ Test 7 Passed: Successfully walked through Row F seating lane');
+console.log(`Arrived at Seat D4: (${provider.currentX}, ${provider.currentY})`);
+if (provider.currentX !== 35.0 || provider.currentY !== 58.8) {
+  throw new Error(`Expected (35.0, 58.8), got (${provider.currentX}, ${provider.currentY})`);
+}
+console.log('✓ Stage 5 Passed: Successfully arrived at exact Seat D4 (35.0, 58.8)');
 
-// TEST 8: Stepping over seats collision check
-// Try to move UP while inside the seating row!
+// 6. Test Obstacle: Stepping over seats between rows
+console.log(`\n--- Stage 6: Seat Collision & Obstacle Protection ---`);
 lastBlockedReason = null;
 const upOverSeats = provider.moveDirection('UP', 2.5);
-if (upOverSeats.moved || !lastBlockedReason.includes('Cannot step over seats')) {
-  throw new Error(`Expected seat obstacle block, got: ${JSON.stringify(upOverSeats)}`);
+if (upOverSeats.moved || !upOverSeats.reason.includes('Cannot step over seats')) {
+  throw new Error(`Expected seat block, got: ${JSON.stringify(upOverSeats)}`);
 }
-console.log(`✓ Test 8 Passed: Stepping over seats blocked -> "${lastBlockedReason}"`);
+console.log(`Blocked vertical movement over seats: "${upOverSeats.reason}"`);
+if (provider.currentX !== 35.0 || provider.currentY !== 58.8) throw new Error('Position should remain unchanged');
+console.log('✓ Stage 6 Passed: Stepping over seats physically prevented without freezing');
 
-// TEST 9: Walk back to central aisle to change rows
+// 7. Walk Back along Row D to Central Aisle
+console.log(`\n--- Stage 7: Walk Back to Central Aisle ---`);
 for (let i = 0; i < 6; i++) {
   provider.moveDirection('RIGHT', 2.5);
 }
-console.log(`Returned to central aisle at X=${provider.currentX}`);
-if (provider.currentX < 42.0 || provider.currentX > 58.0) throw new Error('Should be back in central aisle');
-console.log('✓ Test 9 Passed: Walked back to central aisle');
+console.log(`Returned to Aisle: Position=(${provider.currentX}, ${provider.currentY})`);
+if (provider.currentX !== 50.0) throw new Error('Failed to return to central aisle');
+console.log('✓ Stage 7 Passed: Returned to Central Aisle (50.0, 58.8)');
 
-// TEST 10: Now moving UP in central aisle is permitted again!
-const upAisle = provider.moveDirection('UP', 2.5);
-if (!upAisle.moved) throw new Error('Should be able to move vertically in central aisle');
-console.log(`✓ Test 10 Passed: Vertical movement restored inside central aisle -> (${provider.currentX}, ${provider.currentY})`);
-
-// TEST 11: Reset to entrance
+// 8. Test Checkpoint Jump & Reset
+console.log(`\n--- Stage 8: Checkpoint Jump & Reset ---`);
 provider.resetToEntrance();
 if (provider.currentX !== 50.0 || provider.currentY !== 95.0) throw new Error('Reset failed');
-console.log(`✓ Test 11 Passed: Reset to entrance restored coordinates to (50.0, 95.0)`);
+console.log('✓ Stage 8 Passed: Reset to Entrance restored (50.0, 95.0)');
 
-console.log('==================================================');
-console.log('ALL 11 SIMULATION MOVEMENT TESTS PASSED 100%!');
-console.log('==================================================');
-
+console.log('\n======================================================================');
+console.log('🎉 ALL 8 JOURNEY & COLLISION TEST STAGES PASSED 100%!');
+console.log('======================================================================');

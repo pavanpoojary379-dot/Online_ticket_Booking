@@ -96,8 +96,11 @@ export class SimulationLocationProvider implements ILocationProvider {
 
   /**
    * Directional pad movement with collision awareness:
-   * Vertical movement between rows requires being inside an aisle corridor.
-   * Customers cannot step over the back of cinema seats!
+   * - Free movement along all aisles (central, left, right, front, rear concourses).
+   * - Smooth alignment into row lanes when turning from aisles.
+   * - Movement along row seating lanes to reach booked seats.
+   * - Stepping over seat backs between rows is physically blocked with helpful guidance.
+   * - Clamped to auditorium boundaries with clear notifications.
    */
   public moveDirection(
     direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT',
@@ -106,122 +109,128 @@ export class SimulationLocationProvider implements ILocationProvider {
     let nextX = this.currentX;
     let nextY = this.currentY;
 
-    switch (direction) {
-      case 'UP':
-        nextY -= step;
-        break;
-      case 'DOWN':
-        nextY += step;
-        break;
-      case 'LEFT':
-        nextX -= step;
-        break;
-      case 'RIGHT':
-        nextX += step;
-        break;
-    }
-
-    // When turning from central or side aisles into a row walkway, snap Y to row centerline for smooth navigation
-    if (Math.abs(this.currentX - 50.0) <= 8.0 && Math.abs(nextX - 50.0) > 8.0) {
-      const closestRow = this.rowPositions.find((ry) => Math.abs(this.currentY - ry) <= 3.8);
-      if (closestRow !== undefined) {
-        nextY = closestRow;
+    if (direction === 'UP') {
+      if (this.currentY <= 8.0) {
+        const reason = 'Cinema screen reached. Please take your seat.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
-    }
-
-    const check = this.isValidMovement(this.currentX, this.currentY, nextX, nextY);
-
-    if (check.valid) {
-      this.setPosition(nextX, nextY);
-      return { moved: true, x: this.currentX, y: this.currentY };
-    } else {
-      const reason = check.reason || 'Movement blocked: Path obstructed by cinema seating or walls.';
-      if (this.onBlockedCallback) {
-        this.onBlockedCallback(reason);
+      // If customer is in seating area between aisles, prevent walking through seat backs
+      if (!this.isInAisle(this.currentX, this.currentY)) {
+        const closestRow = this.getClosestRow(this.currentY, 3.5);
+        const rowName = closestRow !== undefined ? `Row` : 'your row';
+        const reason = `Cannot step over seats. Please walk along ${rowName} back to the central aisle to change rows.`;
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
       }
-      return { moved: false, x: this.currentX, y: this.currentY, reason };
+      nextY = Math.max(8.0, Math.round((this.currentY - step) * 10) / 10);
+    } else if (direction === 'DOWN') {
+      if (this.currentY >= 96.0) {
+        const reason = 'Auditorium entrance reached. Turn around towards the cinema screen.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      if (!this.isInAisle(this.currentX, this.currentY)) {
+        const closestRow = this.getClosestRow(this.currentY, 3.5);
+        const rowName = closestRow !== undefined ? `Row` : 'your row';
+        const reason = `Cannot step over seats. Please walk along ${rowName} back to the central aisle to change rows.`;
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      nextY = Math.min(96.0, Math.round((this.currentY + step) * 10) / 10);
+    } else if (direction === 'LEFT') {
+      if (this.currentX <= 4.0) {
+        const reason = 'Auditorium left wall reached.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      // When turning from central aisle into row walkway, automatically snap Y to the nearest row centerline
+      if (Math.abs(this.currentX - 50.0) <= 8.0 && this.currentY > 22.0 && this.currentY < 84.0) {
+        const closest = this.getClosestRow(this.currentY, 6.0);
+        if (closest !== undefined) {
+          nextY = closest;
+        }
+      }
+      nextX = Math.max(4.0, Math.round((this.currentX - step) * 10) / 10);
+    } else if (direction === 'RIGHT') {
+      if (this.currentX >= 96.0) {
+        const reason = 'Auditorium right wall reached.';
+        if (this.onBlockedCallback) this.onBlockedCallback(reason);
+        return { moved: false, x: this.currentX, y: this.currentY, reason };
+      }
+      // When turning from central aisle into row walkway, automatically snap Y to the nearest row centerline
+      if (Math.abs(this.currentX - 50.0) <= 8.0 && this.currentY > 22.0 && this.currentY < 84.0) {
+        const closest = this.getClosestRow(this.currentY, 6.0);
+        if (closest !== undefined) {
+          nextY = closest;
+        }
+      }
+      nextX = Math.min(96.0, Math.round((this.currentX + step) * 10) / 10);
     }
+
+    this.setPosition(nextX, nextY);
+    return { moved: true, x: this.currentX, y: this.currentY };
   }
 
   /**
-   * Validates if a movement vector is permissible inside cinema architecture:
-   * - Aisles (Central, Left, Right, Rear Concourse, Front Concourse)
-   * - Row lanes (within tolerance of any row Y line)
+   * Determines if a point is within an accessible aisle or concourse:
+   * - Central Main Aisle (X: 38 - 62)
+   * - Left Side Aisle (X: 4 - 16)
+   * - Right Side Aisle (X: 84 - 96)
+   * - Rear Cross Concourse & Foyer (Y: 84 - 97)
+   * - Front Screen Concourse (Y: 8 - 22)
+   * - Screen map configured corridors
    */
-  private isValidMovement(
-    currX: number,
-    currY: number,
-    targetX: number,
-    targetY: number
-  ): { valid: boolean; reason?: string } {
-    // 1. Boundary check: Cinema auditorium walls
-    if (targetX < 4.0 || targetX > 96.0 || targetY < 10.0 || targetY > 97.0) {
-      return { valid: false, reason: 'Auditorium wall reached. Movement outside boundaries is not allowed.' };
+  public isInAisle(x: number, y: number): boolean {
+    // Rear concourse / foyer (across full auditorium width)
+    if (y >= 84.0) return true;
+    // Front screen concourse (across full auditorium width)
+    if (y <= 22.0) return true;
+    // Central Main Aisle
+    if (x >= 38.0 && x <= 62.0) return true;
+    // Left Side Aisle
+    if (x <= 16.0) return true;
+    // Right Side Aisle
+    if (x >= 84.0) return true;
+
+    // Check custom configured aisles from screenMap
+    if (this.aisles && this.aisles.length > 0) {
+      const match = this.aisles.some((a) => {
+        if (a.type === 'VERTICAL') {
+          const w = (a.width || 8.0) + 4.0;
+          const ax = a.x !== undefined ? a.x : 50.0;
+          const y1 = a.y1 !== undefined ? a.y1 - 2.0 : 12.0;
+          const y2 = a.y2 !== undefined ? a.y2 + 2.0 : 96.0;
+          return Math.abs(x - ax) <= w / 2 && y >= y1 && y <= y2;
+        } else {
+          const h = (a.height || 6.0) + 4.0;
+          const ay = a.y !== undefined ? a.y : 88.0;
+          const x1 = a.x1 !== undefined ? a.x1 - 2.0 : 4.0;
+          const x2 = a.x2 !== undefined ? a.x2 + 2.0 : 96.0;
+          return Math.abs(y - ay) <= h / 2 && x >= x1 && x <= x2;
+        }
+      });
+      if (match) return true;
     }
 
-    const inAisle = (x: number, y: number) => {
-      // If we have aisles defined from screenMap, use them
-      if (this.aisles && this.aisles.length > 0) {
-        const inConfiguredAisle = this.aisles.some((a) => {
-          if (a.type === 'VERTICAL') {
-            const w = (a.width || 8.0) + 2.0; // slight tolerance
-            const ax = a.x !== undefined ? a.x : 50.0;
-            const y1 = a.y1 !== undefined ? a.y1 - 1.5 : 12.0;
-            const y2 = a.y2 !== undefined ? a.y2 + 2.0 : 97.0;
-            return Math.abs(x - ax) <= w / 2 && y >= y1 && y <= y2;
-          } else {
-            const h = (a.height || 6.0) + 2.0;
-            const ay = a.y !== undefined ? a.y : 88.0;
-            const x1 = a.x1 !== undefined ? a.x1 - 2.0 : 4.0;
-            const x2 = a.x2 !== undefined ? a.x2 + 2.0 : 96.0;
-            return Math.abs(y - ay) <= h / 2 && x >= x1 && x <= x2;
-          }
-        });
-        if (inConfiguredAisle) return true;
-      }
-
-      // Default aisle corridors:
-      // Central Aisle: 42 to 58 (width 16)
-      // Left Aisle: 4 to 14
-      // Right Aisle: 86 to 96
-      // Rear Concourse: 84 to 97
-      // Front Concourse: 10 to 22
-      const inCentralAisle = x >= 42.0 && x <= 58.0;
-      const inLeftAisle = x >= 4.0 && x <= 14.0;
-      const inRightAisle = x >= 86.0 && x <= 96.0;
-      const inRearAisle = y >= 84.0 && y <= 97.0;
-      const inFrontAisle = y >= 10.0 && y <= 22.0;
-      return inCentralAisle || inLeftAisle || inRightAisle || inRearAisle || inFrontAisle;
-    };
-
-    const isNearRowLane = (y: number) => {
-      return this.rowPositions.some((rowY) => Math.abs(y - rowY) <= 3.8);
-    };
-
-    const isVerticalMove = Math.abs(targetY - currY) > 0.4;
-
-    // If moving vertically across rows:
-    // User MUST be inside an aisle to move vertically between rows!
-    // Stepping over cinema seats is physically prohibited.
-    if (isVerticalMove) {
-      if (!inAisle(currX, currY) && !inAisle(targetX, targetY)) {
-        return {
-          valid: false,
-          reason: 'Cannot step over seats. Please walk along your row back to the central or side aisle to change rows.',
-        };
-      }
-    }
-
-    // Target position must either be in a designated aisle or within a row lane
-    if (!inAisle(targetX, targetY) && !isNearRowLane(targetY)) {
-      return {
-        valid: false,
-        reason: 'Obstruction: Please remain within marked auditorium aisles and row walkways.',
-      };
-    }
-
-    return { valid: true };
+    return false;
   }
+
+  /**
+   * Finds the closest row Y line to a given coordinate within maxDistance
+   */
+  public getClosestRow(y: number, maxDistance: number = 6.0): number | undefined {
+    let bestRow: number | undefined;
+    let minD = maxDistance;
+    for (const ry of this.rowPositions) {
+      const d = Math.abs(y - ry);
+      if (d <= minD) {
+        minD = d;
+        bestRow = ry;
+      }
+    }
+    return bestRow;
+    }
 
   private notify(): void {
     const loc = this.getCurrentLocation();

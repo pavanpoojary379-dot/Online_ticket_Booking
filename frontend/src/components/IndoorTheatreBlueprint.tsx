@@ -30,8 +30,15 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
   const targetSeat = screenMap.seats.find((s) => s.id === targetSeatId);
   const targetRow = targetSeat ? targetSeat.row_label : '';
 
+  // Dynamically ensure suggested path originates exactly from the live user location
+  const activeRoute = React.useMemo(() => {
+    if (!route || route.length === 0) return [];
+    // Anchor first point to live user coordinates for instant visual continuity
+    return [{ x: currentX, y: currentY }, ...route.slice(1)];
+  }, [route, currentX, currentY]);
+
   // Generate SVG polyline points string from route array
-  const routePointsString = route.map((pt) => `${pt.x},${pt.y}`).join(' ');
+  const routePointsString = activeRoute.map((pt) => `${pt.x},${pt.y}`).join(' ');
 
   return (
     <div className="w-full max-w-4xl bg-gradient-to-b from-[#0b0e14] via-[#090b10] to-[#0d1017] rounded-3xl p-4 sm:p-8 border border-slate-800 shadow-2xl relative select-none overflow-hidden">
@@ -442,12 +449,19 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
               onClick={() => onSelectCheckpoint && onSelectCheckpoint(cp)}
               className="cursor-pointer group"
             >
+              {/* Transparent enlarged hit area for effortless clicking on desktop & mobile */}
               <circle
                 cx={cp.x}
                 cy={cp.y}
-                r="1.2"
+                r="3.5"
+                fill="transparent"
+              />
+              <circle
+                cx={cp.x}
+                cy={cp.y}
+                r="1.3"
                 fill="#38bdf8"
-                fillOpacity="0.4"
+                fillOpacity="0.45"
                 stroke="#38bdf8"
                 strokeWidth="0.4"
               />
