@@ -85,3 +85,4 @@ class ShowPreferencesResponse(BaseModel):
     max_price: float
     seating_preferences: List[Dict[str, str]]
     max_tickets_allowed: int = 10
+

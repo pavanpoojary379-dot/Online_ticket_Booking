@@ -545,3 +545,4 @@ def recommend_seats_intelligent(db: Session, req: SeatRecommendationRequest) -> 
         recommendations=recommendations,
         message=f"Found {len(recommendations)} personalized recommendation(s) matching your criteria.",
     )
+

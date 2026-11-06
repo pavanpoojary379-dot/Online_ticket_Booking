@@ -33,3 +33,4 @@ def get_preferences(
     Returns available seating preference options, category counts, and price bounds for a show.
     """
     return get_show_preferences(db, show_id)
+
