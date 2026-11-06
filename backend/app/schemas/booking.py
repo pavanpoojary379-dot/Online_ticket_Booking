@@ -43,6 +43,7 @@ class PaymentOut(BaseModel):
     transaction_id: str
     amount: float
     status: str
+    failure_reason: Optional[str] = None
     created_at: datetime
 
     class Config:

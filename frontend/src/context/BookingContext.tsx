@@ -16,6 +16,14 @@ export interface StoredBookingSession {
   updatedAt: string;
 }
 
+export const parseUtcDate = (dateStr: string | null | undefined): number => {
+  if (!dateStr) return 0;
+  const hasTz = dateStr.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(dateStr);
+  const normalized = hasTz ? dateStr : `${dateStr}Z`;
+  const time = new Date(normalized).getTime();
+  return isNaN(time) ? 0 : time;
+};
+
 export const loadStoredSession = (): StoredBookingSession | null => {
   try {
     const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -103,9 +111,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     discountPercent: number;
     discountAmount: number;
   } | null>(initialStored?.appliedCoupon || null);
+  const initialExpires = initialStored?.lockExpiresAt ? parseUtcDate(initialStored.lockExpiresAt) : 0;
+  const initialRemaining = initialExpires > Date.now() ? Math.floor((initialExpires - Date.now()) / 1000) : 0;
+
   const [currentBooking, setCurrentBookingState] = useState<Booking | null>(null);
   const [lockExpiresAt, setLockExpiresAtState] = useState<string | null>(initialStored?.lockExpiresAt || null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(initialRemaining);
   const [isLockExpired, setIsLockExpired] = useState<boolean>(false);
   const [isRestoringSession, setIsRestoringSession] = useState<boolean>(true);
 
@@ -148,7 +159,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setLockExpiresAt = (expiresAt: string | null) => {
     setLockExpiresAtState(expiresAt);
-    setIsLockExpired(false);
+    if (expiresAt) {
+      setIsLockExpired(false);
+      const remaining = Math.max(0, Math.floor((parseUtcDate(expiresAt) - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+    } else {
+      setRemainingSeconds(0);
+    }
     persistSession({ lockExpiresAt: expiresAt });
   };
 
@@ -160,8 +177,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const updateTimer = () => {
-      const now = new Date().getTime();
-      const expires = new Date(lockExpiresAt).getTime();
+      const now = Date.now();
+      const expires = parseUtcDate(lockExpiresAt);
       const diff = Math.max(0, Math.floor((expires - now) / 1000));
       setRemainingSeconds(diff);
 
@@ -348,12 +365,14 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         // Unauthenticated customer: Preserve selected seats & show in state
         if (stored.lockExpiresAt) {
-          const expiresTime = new Date(stored.lockExpiresAt).getTime();
+          const expiresTime = parseUtcDate(stored.lockExpiresAt);
           if (expiresTime > Date.now()) {
             setLockExpiresAtState(stored.lockExpiresAt);
+            setRemainingSeconds(Math.floor((expiresTime - Date.now()) / 1000));
             setIsLockExpired(false);
           } else {
             setIsLockExpired(true);
+            setRemainingSeconds(0);
           }
         }
       }

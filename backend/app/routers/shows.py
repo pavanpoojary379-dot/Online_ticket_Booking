@@ -36,6 +36,8 @@ def _build_show_out(s: Show, db: Session) -> ShowOut:
         movie_id=s.movie_id,
         theatre_id=s.theatre_id,
         screen_id=s.screen_id,
+        screen_number=s.screen.screen_number if s.screen else s.screen_id,
+        screen_name=s.screen.name if s.screen else f"Screen {s.screen_id}",
         show_time=s.show_time,
         screen_format=s.screen_format,
         silver_price=s.silver_price,

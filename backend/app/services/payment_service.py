@@ -48,6 +48,12 @@ def process_simulated_payment(
     if booking.status == "CONFIRMED":
         raise HTTPException(status_code=400, detail="Booking is already confirmed")
 
+    if booking.status == "CANCELLED":
+        raise HTTPException(
+            status_code=400,
+            detail="This booking has expired or was cancelled. Please select seats again."
+        )
+
     seat_ids = [bs.seat_id for bs in booking.seats]
     now = datetime.utcnow()
 
@@ -66,20 +72,42 @@ def process_simulated_payment(
             detail="Your 5-minute seat reservation has expired. Please select seats and try again."
         )
 
+    # Re-verify no other confirmed booking took these seats
+    already_booked = db.query(BookingSeat.seat_id).join(Booking).filter(
+        Booking.show_id == booking.show_id,
+        Booking.status == "CONFIRMED",
+        Booking.id != booking.id,
+        BookingSeat.seat_id.in_(seat_ids)
+    ).all()
+    if already_booked:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="One or more selected seats have already been booked by another customer."
+        )
+
     # Generate a transaction reference
     transaction_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
 
+    existing_payment = db.query(Payment).filter(Payment.booking_id == booking.id).first()
+
     if simulate_status != "SUCCESS":
         # Payment Failed / Cancelled flow
-        failed_payment = Payment(
-            booking_id=booking.id,
-            payment_method=payment_method,
-            transaction_id=transaction_id,
-            amount=booking.final_amount,
-            status=simulate_status.upper(),
-            failure_reason=failure_reason or "Simulated payment decline / cancellation by user"
-        )
-        db.add(failed_payment)
+        if existing_payment:
+            existing_payment.payment_method = payment_method
+            existing_payment.transaction_id = transaction_id
+            existing_payment.amount = booking.final_amount
+            existing_payment.status = simulate_status.upper()
+            existing_payment.failure_reason = failure_reason or "Payment declined / cancelled by user"
+        else:
+            failed_payment = Payment(
+                booking_id=booking.id,
+                payment_method=payment_method,
+                transaction_id=transaction_id,
+                amount=booking.final_amount,
+                status=simulate_status.upper(),
+                failure_reason=failure_reason or "Payment declined / cancelled by user"
+            )
+            db.add(failed_payment)
 
         # Release locks immediately so other users can book
         db.query(SeatLock).filter(
@@ -94,20 +122,29 @@ def process_simulated_payment(
         return {
             "success": False,
             "status": simulate_status.upper(),
+            "booking_id": booking.id,
+            "booking_code": booking.booking_code,
             "transaction_id": transaction_id,
-            "message": failure_reason or "Payment was not successful. Your seats have been released."
+            "message": failure_reason or "Payment was not successful. Your tickets have not been booked and seats have been released."
         }
 
     # SUCCESS FLOW: Confirm booking
-    payment = Payment(
-        booking_id=booking.id,
-        payment_method=payment_method,
-        transaction_id=transaction_id,
-        amount=booking.final_amount,
-        status="SUCCESS",
-        failure_reason=None
-    )
-    db.add(payment)
+    if existing_payment:
+        existing_payment.payment_method = payment_method
+        existing_payment.transaction_id = transaction_id
+        existing_payment.amount = booking.final_amount
+        existing_payment.status = "SUCCESS"
+        existing_payment.failure_reason = None
+    else:
+        payment = Payment(
+            booking_id=booking.id,
+            payment_method=payment_method,
+            transaction_id=transaction_id,
+            amount=booking.final_amount,
+            status="SUCCESS",
+            failure_reason=None
+        )
+        db.add(payment)
 
     booking.status = "CONFIRMED"
 
@@ -122,28 +159,33 @@ def process_simulated_payment(
     db.refresh(booking)
 
     # Generate QR Code and PDF ticket
-    show = db.query(Show).filter(Show.id == booking.show_id).first()
-    movie = db.query(Movie).filter(Movie.id == show.movie_id).first()
-    theatre = db.query(Theatre).filter(Theatre.id == show.theatre_id).first()
+    try:
+        show = db.query(Show).filter(Show.id == booking.show_id).first()
+        movie = db.query(Movie).filter(Movie.id == show.movie_id).first() if show else None
+        theatre = db.query(Theatre).filter(Theatre.id == show.theatre_id).first() if show else None
 
-    qr_path = generate_booking_qr(booking.booking_code, show.id, movie.title)
-    booking.qr_code_path = qr_path
+        qr_path = generate_booking_qr(booking.booking_code, show.id if show else 0, movie.title if movie else "CineBook Ticket")
+        booking.qr_code_path = qr_path
 
-    # Generate PDF
-    pdf_path = generate_pdf_ticket(booking, movie, theatre, show, booking.seats)
-    booking.pdf_ticket_path = pdf_path
+        if movie and theatre and show:
+            pdf_path = generate_pdf_ticket(booking, movie, theatre, show, booking.seats)
+            booking.pdf_ticket_path = pdf_path
 
-    db.commit()
-    db.refresh(booking)
+        db.commit()
+        db.refresh(booking)
+    except Exception as e:
+        print(f"Non-fatal error generating ticket visual assets: {e}")
+        db.commit()
 
     return {
         "success": True,
-        "status": "SUCCESS",
+        "status": "CONFIRMED",
+        "booking_id": booking.id,
         "booking_code": booking.booking_code,
         "transaction_id": transaction_id,
         "amount_paid": booking.final_amount,
-        "qr_code_url": qr_path,
-        "pdf_ticket_url": pdf_path,
-        "message": "Payment successful! Your tickets are confirmed."
+        "qr_code_url": booking.qr_code_path,
+        "pdf_ticket_url": booking.pdf_ticket_path,
+        "message": "Payment successful! Your tickets have been successfully booked."
     }
 

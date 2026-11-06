@@ -12,7 +12,10 @@ import {
   Loader2,
   Lock,
   ChevronLeft,
-  Info
+  Clock,
+  ArrowRight,
+  RotateCcw,
+  Film
 } from 'lucide-react';
 import { bookingsApi, paymentsApi } from '../services/api';
 import { Booking } from '../types';
@@ -32,6 +35,13 @@ export const PaymentPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStep, setProcessingStep] = useState<string>('');
 
+  // Payment result states
+  const [paymentFailed, setPaymentFailed] = useState<{
+    reason: string;
+    transactionId?: string;
+  } | null>(null);
+  const [holdExpired, setHoldExpired] = useState<boolean>(false);
+
   // Form states (test dummy inputs)
   const [upiId, setUpiId] = useState<string>('hackathon@okhdfcbank');
   const [cardNumber, setCardNumber] = useState<string>('4111 •••• •••• 1111');
@@ -40,7 +50,7 @@ export const PaymentPage: React.FC = () => {
   const [selectedBank, setSelectedBank] = useState<string>('HDFC Bank');
   const [selectedWallet, setSelectedWallet] = useState<string>('Amazon Pay');
 
-  const { resetBooking } = useBooking();
+  const { resetBooking, remainingSeconds, isLockExpired } = useBooking();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +59,9 @@ export const PaymentPage: React.FC = () => {
       try {
         const data = await bookingsApi.getById(Number(bookingId));
         setBooking(data);
+        if (data.status === 'CONFIRMED') {
+          navigate(`/booking/confirmation/${data.id}`, { replace: true });
+        }
       } catch (err) {
         console.error('Failed to load booking:', err);
       } finally {
@@ -56,10 +69,21 @@ export const PaymentPage: React.FC = () => {
       }
     };
     fetchBooking();
-  }, [bookingId]);
+  }, [bookingId, navigate]);
+
+  const formatTimer = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const handlePayNow = async () => {
     if (!booking) return;
+
+    if (isLockExpired || holdExpired || remainingSeconds <= 0) {
+      setHoldExpired(true);
+      return;
+    }
 
     setIsProcessing(true);
     setProcessingStep('Connecting to simulated payment gateway...');
@@ -85,25 +109,125 @@ export const PaymentPage: React.FC = () => {
 
         setIsProcessing(false);
 
-        if (res.success) {
+        if (res.success && (res.status === 'SUCCESS' || res.status === 'CONFIRMED')) {
           resetBooking();
           navigate(`/booking/confirmation/${booking.id}`);
         } else {
-          alert(`Simulated Outcome: ${res.message}`);
-          navigate(`/booking/seats/${booking.show_id}`);
+          setPaymentFailed({
+            reason: res.message || 'Payment simulation failed. Your tickets have not been booked and seats have been released.',
+            transactionId: res.transaction_id,
+          });
         }
       } catch (err: any) {
         setIsProcessing(false);
-        alert(err.response?.data?.detail || 'Payment simulation failed. Your seats may have been released.');
-        navigate(`/booking/seats/${booking.show_id}`);
+        if (err.response?.status === 408) {
+          setHoldExpired(true);
+        } else {
+          setPaymentFailed({
+            reason: err.response?.data?.detail || 'Payment processing error. Your tickets have not been booked.',
+          });
+        }
       }
-    }, 2200);
+    }, 1800);
   };
 
   if (loading || !booking) {
     return (
       <div className="min-h-screen bg-[#090a0f] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // 1. Seat Hold Expired view
+  if (holdExpired || isLockExpired || remainingSeconds <= 0) {
+    return (
+      <div className="min-h-screen bg-[#090a0f] text-slate-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-lg mx-auto px-4 py-16 flex-1 flex flex-col justify-center items-center text-center">
+          <div className="bg-[#0e1117] border border-orange-500/30 rounded-3xl p-8 space-y-5 shadow-2xl w-full">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto text-orange-400">
+              <Clock className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-orange-400">Reservation Timed Out</span>
+              <h2 className="text-2xl font-black text-white font-['Outfit']">Seat Hold Expired</h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Cinema seats are held temporarily for 5 minutes during checkout to guarantee fair access for all moviegoers. Your reservation window has ended, and the selected seats are no longer reserved.
+              </p>
+            </div>
+            <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 text-xs text-slate-400 text-left space-y-1">
+              <div>Movie: <span className="text-white font-semibold">{booking.show?.movie?.title}</span></div>
+              <div>Seats: <span className="text-white font-semibold">{booking.seats?.map((s) => s.seat_label).join(', ')}</span></div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => navigate(`/booking/seats/${booking.show_id}`)}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center space-x-1.5"
+              >
+                <span>Re-select Seats</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <Link
+                to="/"
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+              >
+                Browse Movies
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // 2. Booking Failed view
+  if (paymentFailed) {
+    return (
+      <div className="min-h-screen bg-[#090a0f] text-slate-100 flex flex-col">
+        <Navbar />
+        <main className="max-w-lg mx-auto px-4 py-16 flex-1 flex flex-col justify-center items-center text-center">
+          <div className="bg-[#0e1117] border border-red-500/30 rounded-3xl p-8 space-y-5 shadow-2xl w-full">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto text-red-400">
+              <XCircle className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-red-400">Transaction Not Completed</span>
+              <h2 className="text-2xl font-black text-white font-['Outfit']">Booking Failed</h2>
+              <p className="text-xs text-red-300 font-semibold">
+                Your tickets have not been booked.
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {paymentFailed.reason}
+              </p>
+            </div>
+            <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 text-xs text-slate-400 text-left space-y-1 font-mono">
+              <div>Booking Code: <span className="text-white font-semibold">{booking.booking_code}</span></div>
+              {paymentFailed.transactionId && <div>Txn Ref: <span className="text-orange-400">{paymentFailed.transactionId}</span></div>}
+              <div>Attempted Amount: <span className="text-white">₹{booking.final_amount.toFixed(2)}</span></div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setPaymentFailed(null);
+                  setSimOutcome('SUCCESS');
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center space-x-1.5"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Try Payment Again</span>
+              </button>
+              <button
+                onClick={() => navigate(`/booking/seats/${booking.show_id}`)}
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+              >
+                Re-select Seats
+              </button>
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }
@@ -127,6 +251,20 @@ export const PaymentPage: React.FC = () => {
               Simulated Payment Gateway
             </h1>
             <p className="text-xs text-slate-400">Complete your movie ticket purchase</p>
+          </div>
+        </div>
+
+        {/* Seat Hold Active Countdown Banner */}
+        <div className="rounded-2xl bg-orange-500/10 border border-orange-500/30 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5 text-orange-400 font-semibold">
+            <Clock className="w-4 h-4 animate-pulse text-orange-400 flex-shrink-0" />
+            <span>5-Minute Seat Reservation Hold Active — Complete payment before timer expires</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-slate-400">Time Remaining:</span>
+            <span className="font-mono font-bold text-orange-300 text-sm bg-orange-500/20 px-2.5 py-1 rounded-lg border border-orange-500/40">
+              {formatTimer(remainingSeconds)}
+            </span>
           </div>
         </div>
 

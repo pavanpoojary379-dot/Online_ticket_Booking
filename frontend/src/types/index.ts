@@ -48,6 +48,8 @@ export interface Show {
   movie_id: number;
   theatre_id: number;
   screen_id: number;
+  screen_number?: number;
+  screen_name?: string;
   show_time: string; // ISO datetime
   screen_format: string; // "2D", "3D", "IMAX"
   silver_price: number;
@@ -166,6 +168,7 @@ export interface Payment {
   transaction_id: string;
   amount: number;
   status: 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  failure_reason?: string;
   created_at: string;
 }
 

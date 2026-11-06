@@ -151,7 +151,7 @@ def hold_seats(db: Session, show_id: int, seat_ids: List[int], user_id: int) -> 
         "message": f"{len(seat_ids)} seats temporarily locked",
         "show_id": show_id,
         "seat_ids": seat_ids,
-        "expires_at": expires_at.isoformat(),
+        "expires_at": expires_at.isoformat() + "Z",
         "duration_seconds": SEAT_LOCK_DURATION_SECONDS
     }
 
@@ -188,7 +188,7 @@ def verify_user_seat_locks(db: Session, show_id: int, seat_ids: List[int], user_
         remaining = max(0, int((min_expires - now).total_seconds()))
         return {
             "is_locked_by_user": True,
-            "expires_at": min_expires.isoformat(),
+            "expires_at": min_expires.isoformat() + "Z",
             "remaining_seconds": remaining,
             "seat_ids": seat_ids,
         }

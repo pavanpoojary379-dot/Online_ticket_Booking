@@ -9,6 +9,8 @@ class ShowOut(BaseModel):
     movie_id: int
     theatre_id: int
     screen_id: int
+    screen_number: Optional[int] = None
+    screen_name: Optional[str] = None
     show_time: datetime
     screen_format: str
     silver_price: float

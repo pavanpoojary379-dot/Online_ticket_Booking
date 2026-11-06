@@ -30,7 +30,7 @@ export const BookingSummaryPage: React.FC = () => {
 
   // If page was loaded directly or refreshed, trigger restoration if not already populated
   useEffect(() => {
-    if (!selectedShow || selectedSeats.length === 0 || remainingSeconds <= 0) {
+    if (!selectedShow || selectedSeats.length === 0) {
       restoreBookingSession();
     }
   }, [restoreBookingSession]);

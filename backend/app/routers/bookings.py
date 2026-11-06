@@ -59,6 +59,8 @@ def _format_booking_out(b: Booking) -> BookingOut:
             movie_id=b.show.movie_id,
             theatre_id=b.show.theatre_id,
             screen_id=b.show.screen_id,
+            screen_number=b.show.screen.screen_number if b.show.screen else b.show.screen_id,
+            screen_name=b.show.screen.name if b.show.screen else f"Screen {b.show.screen_id}",
             show_time=b.show.show_time,
             screen_format=b.show.screen_format,
             silver_price=b.show.silver_price,
@@ -76,6 +78,7 @@ def _format_booking_out(b: Booking) -> BookingOut:
             transaction_id=b.payment.transaction_id,
             amount=b.payment.amount,
             status=b.payment.status,
+            failure_reason=b.payment.failure_reason,
             created_at=b.payment.created_at
         )
 
