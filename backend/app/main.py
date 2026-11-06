@@ -16,7 +16,8 @@ from app.routers import (
     payments,
     tickets,
     coupons,
-    admin
+    admin,
+    recommendations
 )
 
 @asynccontextmanager
@@ -61,6 +62,7 @@ app.include_router(payments.router)
 app.include_router(tickets.router)
 app.include_router(coupons.router)
 app.include_router(admin.router)
+app.include_router(recommendations.router)
 
 @app.get("/")
 def root():

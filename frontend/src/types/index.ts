@@ -71,6 +71,67 @@ export interface Seat {
   status: SeatStatus;
 }
 
+export interface SeatScoreBreakdown {
+  central_position_score: number;
+  viewing_distance_score: number;
+  adjacent_seating_score: number;
+  budget_score: number;
+}
+
+export interface RecommendationCardItem {
+  rank: number;
+  score: number;
+  seat_ids: number[];
+  seat_labels: string[];
+  seats: Seat[];
+  seat_category: string;
+  row: string;
+  individual_price: number;
+  total_price: number;
+  score_breakdown: SeatScoreBreakdown;
+  explanation: string[];
+  summary_reason: string;
+}
+
+export interface SeatRecommendationsResponse {
+  show_id: number;
+  number_of_seats: number;
+  total_recommendations: number;
+  recommendations: RecommendationCardItem[];
+  message?: string;
+}
+
+export interface TierPreferenceInfo {
+  name: string;
+  label: string;
+  price: number;
+  available_count: number;
+}
+
+export interface ShowPreferencesResponse {
+  show_id: number;
+  movie_title: string;
+  theatre_name: string;
+  screen_name: string;
+  screen_format: string;
+  available_seats_count: number;
+  total_seats_count: number;
+  tiers: TierPreferenceInfo[];
+  min_price: number;
+  max_price: number;
+  seating_preferences: { value: string; label: string; description?: string }[];
+  max_tickets_allowed: number;
+}
+
+export interface SeatRecommendationRequestParams {
+  show_id: number;
+  number_of_seats: number;
+  preferred_category?: string;
+  maximum_budget?: number;
+  seating_preference?: string;
+  adjacent_required: boolean;
+}
+
 export interface BookingSeat {
   id?: number;
   seat_id: number;

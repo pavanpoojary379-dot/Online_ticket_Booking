@@ -16,6 +16,8 @@ export const SeatSelectionPage: React.FC = () => {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [locking, setLocking] = useState<boolean>(false);
+  const [recommendedSeatIds, setRecommendedSeatIds] = useState<number[]>([]);
+  const [activeRecommendationRank, setActiveRecommendationRank] = useState<number | null>(null);
 
   const {
     selectedSeats,
@@ -54,8 +56,14 @@ export const SeatSelectionPage: React.FC = () => {
     return () => clearInterval(poll);
   }, [showId]);
 
-  const handleSmartSelect = (recommendedSeats: Seat[]) => {
+  const handleSmartSelect = (recommendedSeats: Seat[], rank?: number) => {
     setSelectedSeats(recommendedSeats);
+    setRecommendedSeatIds(recommendedSeats.map((s) => s.id));
+    setActiveRecommendationRank(rank || 1);
+  };
+
+  const handleHighlightSeats = (seatIds: number[]) => {
+    setRecommendedSeatIds(seatIds);
   };
 
   const handleProceedToSummary = async () => {
@@ -152,20 +160,28 @@ export const SeatSelectionPage: React.FC = () => {
       {/* Main Seat Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col items-center">
         
-        {/* Smart Seat Recommendation Widget */}
+        {/* Smart Seat Advisor Widget */}
         <SmartSeatRecommendation
           showId={show.id}
           onApplyRecommendation={handleSmartSelect}
+          onHighlightSeats={handleHighlightSeats}
+          selectedSeats={selectedSeats}
         />
 
         {/* Interactive Cinema Seat Grid */}
         <SeatGrid
           seats={seats}
           selectedSeats={selectedSeats}
-          onToggleSeat={toggleSeatSelection}
+          onToggleSeat={(seat) => {
+            toggleSeatSelection(seat);
+            // If user manually toggles, reset active recommendation highlight rank
+            setActiveRecommendationRank(null);
+          }}
           silverPrice={show.silver_price}
           goldPrice={show.gold_price}
           platinumPrice={show.platinum_price}
+          recommendedSeatIds={recommendedSeatIds}
+          activeRecommendationRank={activeRecommendationRank}
         />
 
       </main>

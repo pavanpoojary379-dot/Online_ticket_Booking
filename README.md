@@ -19,11 +19,20 @@ A modern, responsive, and full-featured cinema ticketing web application designe
 - **Dynamic City & Format Filtering:** Filter by city (Mumbai, Delhi-NCR, Bengaluru, Hyderabad, Chennai, Pune) and format (2D, 3D, IMAX).
 - **Genre & Search Filters:** Instant client/server search and genre categorization (Action, Sci-Fi, Comedy, Thriller, Horror, Drama).
 
-### 2. Smart Seating & Booking Engine
+### 2. Smart Seating & Smart Seat Advisor (Recommendation Engine)
 - **Interactive Cinema Grid:** Curved cinema screen indicator, aisles, and distinct tiered rows (**Silver Classic**, **Gold Prime**, and **Platinum VIP Recliner**).
-- **Live Seat Availability Status:** Clear visual states for *Available*, *Selected*, *Booked*, and *Reserved (5m Hold)*.
+- **Consistent Visual Indicators:** Available (Neutral), Booked (Red), Recommended (Green), Selected (Orange), Temporarily Locked (Grey dashed).
 - **Temporary Seat Locking (5-minute TTL):** When a customer selects seats and proceeds to checkout, backend locks seats for 300 seconds. Other users cannot double-book them. Automatic expiration cleanup releases seats if checkout is abandoned.
-- **Smart Seat Recommendation:** Rule-based algorithm that automatically identifies available central viewing middle-row seats and adjacent seats for 1, 2, 3, or 4 person groups.
+- **Smart Seat Advisor Panel:** Premium recommendation control panel allowing users to specify:
+  - Tickets required (1 to 10)
+  - Preferred category (Silver, Gold, Platinum, or Any)
+  - Maximum budget per ticket
+  - Seating preference (Best overall view, Centre seats, Front seats, Back seats, Adjacent seats)
+  - Strictly adjacent seating requirement toggle
+- **Weighted Rule-Based Optimization Algorithm:**
+  $$\text{Final Score} = (0.35 \times \text{Central}) + (0.25 \times \text{Viewing Distance}) + (0.25 \times \text{Adjacent}) + (0.15 \times \text{Budget})$$
+  Normalized $0$ to $100$, ranking the top 3 best combinations with detailed score breakdown pills and human-readable explanations.
+- **Instant Map Synchronization:** Recommended options glow in green on the interactive cinema grid. 1-click apply updates selection and flows into booking & payment.
 
 ### 3. Pricing, Coupons & Checkout
 - **Itemized Pricing Breakdown:** Real-time subtotal in INR, per-seat convenience fee, and discounts.
@@ -123,6 +132,20 @@ A modern, responsive, and full-featured cinema ticketing web application designe
    ```
 
 - **Frontend Web App:** `http://localhost:3000` (or `http://localhost:5173`)
+
+---
+
+### Step 3: Running Tests
+
+Run the full end-to-end integration and smart seat recommendation test suites:
+
+```bash
+# 1. Test Smart Seat Recommendation System (All 14 Scenarios)
+python backend/test_smart_recommendations.py
+
+# 2. Test Full 11-Step Cinema Booking Workflow
+python backend/test_e2e_flow.py
+```
 
 ---
 

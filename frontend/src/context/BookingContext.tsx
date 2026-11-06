@@ -71,8 +71,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (exists) {
         return prev.filter((s) => s.id !== seat.id);
       } else {
-        if (prev.length >= 8) {
-          alert('You can select a maximum of 8 seats per booking.');
+        if (prev.length >= 10) {
+          alert('You can select a maximum of 10 seats per booking.');
           return prev;
         }
         return [...prev, seat];

@@ -8,7 +8,10 @@ import {
   Booking,
   Payment,
   Coupon,
-  AdminStats
+  AdminStats,
+  SeatRecommendationsResponse,
+  ShowPreferencesResponse,
+  SeatRecommendationRequestParams
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -113,6 +116,18 @@ export const showsApi = {
       `/shows/${showId}/recommend-seats`,
       { num_seats: numSeats, preferred_tier: preferredTier }
     );
+    return res.data;
+  },
+};
+
+// Smart Seat Recommendations API
+export const recommendationsApi = {
+  getPreferences: async (showId: number) => {
+    const res = await api.get<ShowPreferencesResponse>(`/seat-recommendations/${showId}/preferences`);
+    return res.data;
+  },
+  getRecommendations: async (params: SeatRecommendationRequestParams) => {
+    const res = await api.post<SeatRecommendationsResponse>('/seat-recommendations', params);
     return res.data;
   },
 };

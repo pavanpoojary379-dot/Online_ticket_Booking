@@ -251,9 +251,29 @@ def create_pending_booking(db: Session, show_id: int, seat_ids: List[int], user_
 
 def smart_seat_recommendation(db: Session, show_id: int, num_seats: int = 2, preferred_tier: Optional[str] = None) -> dict:
     """
-    Recommends prime middle-row adjacent seats for groups.
-    Tier preference is honored if possible (Gold > Platinum > Silver by default).
+    Recommends prime middle-row adjacent seats for groups using the intelligent algorithm.
     """
+    try:
+        from app.services.seat_recommendation_service import recommend_seats_intelligent
+        from app.schemas.recommendation import SeatRecommendationRequest
+        req = SeatRecommendationRequest(
+            show_id=show_id,
+            number_of_seats=num_seats,
+            preferred_category=preferred_tier or "ANY",
+            seating_preference="best_view",
+            adjacent_required=True
+        )
+        res = recommend_seats_intelligent(db, req)
+        if res.recommendations:
+            best = res.recommendations[0]
+            return {
+                "seats": [s.model_dump() for s in best.seats],
+                "total_price": best.total_price,
+                "reason": best.summary_reason
+            }
+    except Exception:
+        pass
+
     seat_layout = get_seat_layout_with_status(db, show_id)
 
     # Group seats by row
