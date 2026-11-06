@@ -31,7 +31,7 @@ export interface ILocationProvider {
   setPosition(x: number, y: number): void;
 
   /** Directional delta movement (Up/Down/Left/Right) */
-  moveDirection(direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', step?: number): void;
+  moveDirection(direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', step?: number): { moved: boolean; x: number; y: number; reason?: string };
 
   /** Whether backed by active physical radio hardware */
   isRealHardware(): boolean;

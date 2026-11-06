@@ -64,9 +64,10 @@ export class BLELocationProvider implements ILocationProvider {
     this.notify();
   }
 
-  public moveDirection(direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', step: number = 2.5): void {
+  public moveDirection(direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', step: number = 2.5): { moved: boolean; x: number; y: number; reason?: string } {
     // Hardware BLE positioning derives location from radio signals; manual movement not typical
     console.warn('[BLE Provider] Manual movement not applicable in hardware positioning mode.');
+    return { moved: false, x: this.currentX, y: this.currentY, reason: 'Manual movement not applicable in hardware BLE mode.' };
   }
 
   private notify(): void {

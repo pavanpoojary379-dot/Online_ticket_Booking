@@ -100,6 +100,11 @@ export const IndoorNavigationPage: React.FC = () => {
         // Configure row positions on location provider for collision detection
         const rowYs = Object.values(mapData.row_positions);
         locationProvider.setRowPositions(rowYs);
+        locationProvider.setScreenMap(mapData);
+        locationProvider.onBlocked((reason) => {
+          setToastMessage(reason);
+          setTimeout(() => setToastMessage(null), 3500);
+        });
 
         // Start or resume backend session
         const navSession = await navigationApi.startSession(info.booking_id, initialTargetSeatId);
@@ -176,15 +181,69 @@ export const IndoorNavigationPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [currentCoords.x, currentCoords.y, session]);
 
+  // Directional Movement Handler (D-Pad & Keyboard Arrow Keys)
+  const handleMove = (direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
+    const step = 2.5;
+    const result = locationProvider.moveDirection(direction, step);
+    if (result.moved) {
+      setCurrentCoords({ x: result.x, y: result.y });
+    } else if (result.reason) {
+      setToastMessage(result.reason);
+      setTimeout(() => setToastMessage(null), 3500);
+    }
+  };
+
+  // Reset Location handler
+  const handleResetLocation = () => {
+    const entX = screenMap?.entrance?.x ?? 50.0;
+    const entY = screenMap?.entrance?.y ?? 95.0;
+    locationProvider.resetToEntrance(entX, entY);
+    setCurrentCoords({ x: entX, y: entY });
+    notifiedStatesRef.current.clear();
+    setToastMessage('Location reset to Auditorium Entrance.');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Checkpoint Jump handler
+  const handleJumpTo = (x: number, y: number) => {
+    locationProvider.setPosition(x, y);
+    setCurrentCoords({ x, y });
+  };
+
+  // Dynamic Real-time Location Description
+  const currentLocationDescription = useMemo(() => {
+    if (!screenMap) return 'Auditorium Entrance';
+    const x = currentCoords.x;
+    const y = currentCoords.y;
+
+    if (y >= 93.0) return 'Auditorium Main Entrance';
+    if (y >= 85.0) return 'Rear Concourse Walkway';
+    if (y <= 20.0) return 'Front Screen Concourse';
+
+    if (Math.abs(x - 50.0) <= 6.0) return 'Central Main Aisle';
+    if (x <= 12.0) return 'Left Side Aisle';
+    if (x >= 88.0) return 'Right Side Aisle';
+
+    if (screenMap.row_positions) {
+      for (const [r, ry] of Object.entries(screenMap.row_positions)) {
+        if (Math.abs(y - ry) <= 3.8) {
+          return `Row ${r} Seating Lane`;
+        }
+      }
+    }
+
+    return 'Auditorium Walkway';
+  }, [currentCoords, screenMap]);
+
   // 4. Keyboard Arrow Key Listener for D-Pad
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
-        if (e.key === 'ArrowUp') locationProvider.moveDirection('UP', 2.0);
-        if (e.key === 'ArrowDown') locationProvider.moveDirection('DOWN', 2.0);
-        if (e.key === 'ArrowLeft') locationProvider.moveDirection('LEFT', 2.0);
-        if (e.key === 'ArrowRight') locationProvider.moveDirection('RIGHT', 2.0);
+        if (e.key === 'ArrowUp') handleMove('UP');
+        if (e.key === 'ArrowDown') handleMove('DOWN');
+        if (e.key === 'ArrowLeft') handleMove('LEFT');
+        if (e.key === 'ArrowRight') handleMove('RIGHT');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -250,11 +309,6 @@ export const IndoorNavigationPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to change target seat:', err);
     }
-  };
-
-  // Checkpoint Jump handler
-  const handleJumpTo = (x: number, y: number) => {
-    locationProvider.setPosition(x, y);
   };
 
   // Checkpoint Shortcuts dynamically based on target seat
@@ -461,6 +515,66 @@ export const IndoorNavigationPage: React.FC = () => {
           </div>
         )}
 
+        {/* Real-Time Location Status Panel */}
+        <div className="w-full max-w-4xl bg-[#0e1117] rounded-2xl p-4 border border-slate-800 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Left: Position Coordinates & Location Description */}
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 flex-shrink-0">
+                <MapPin className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Current Location:
+                  </span>
+                  <span className="text-xs font-black text-white bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                    {currentLocationDescription}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 font-mono text-xs">
+                  <span className="text-sky-400 font-bold">
+                    X: <span className="text-white">{currentCoords.x.toFixed(1)}</span>
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-sky-400 font-bold">
+                    Y: <span className="text-white">{currentCoords.y.toFixed(1)}</span>
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-400">
+                    Source: <span className="text-sky-300 font-semibold">Demo Simulation</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Navigation State Badge & Reset Location Button */}
+            <div className="flex items-center space-x-3">
+              <div className="text-right hidden sm:block">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Nav State</span>
+                <span className={`text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border inline-block ${
+                  isSeatReached
+                    ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                    : isTargetRowActive
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                }`}>
+                  {navigationState.replace(/_/g, ' ')}
+                </span>
+              </div>
+
+              <button
+                onClick={handleResetLocation}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-bold flex items-center space-x-1.5 transition-all shadow-md"
+                title="Reset marker to auditorium entrance"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
+                <span>Reset Location</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Interactive Cinema Blueprint Map */}
         <IndoorTheatreBlueprint
           screenMap={screenMap}
@@ -515,10 +629,10 @@ export const IndoorNavigationPage: React.FC = () => {
             {/* Quick Actions */}
             <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
               <button
-                onClick={() => handleJumpTo(50.0, 95.0)}
-                className="text-slate-400 hover:text-white flex items-center space-x-1"
+                onClick={handleResetLocation}
+                className="text-slate-400 hover:text-white flex items-center space-x-1 font-medium transition-colors"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
                 <span>Reset to Entrance</span>
               </button>
 
@@ -544,8 +658,8 @@ export const IndoorNavigationPage: React.FC = () => {
               
               {/* UP */}
               <button
-                onClick={() => locationProvider.moveDirection('UP', 2.5)}
-                className="absolute top-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md"
+                onClick={() => handleMove('UP')}
+                className="absolute top-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 active:bg-orange-600 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400"
                 title="Walk Forward (ArrowUp)"
               >
                 <ArrowUp className="w-5 h-5" />
@@ -553,8 +667,8 @@ export const IndoorNavigationPage: React.FC = () => {
 
               {/* DOWN */}
               <button
-                onClick={() => locationProvider.moveDirection('DOWN', 2.5)}
-                className="absolute bottom-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md"
+                onClick={() => handleMove('DOWN')}
+                className="absolute bottom-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 active:bg-orange-600 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400"
                 title="Walk Backward (ArrowDown)"
               >
                 <ArrowDown className="w-5 h-5" />
@@ -562,8 +676,8 @@ export const IndoorNavigationPage: React.FC = () => {
 
               {/* LEFT */}
               <button
-                onClick={() => locationProvider.moveDirection('LEFT', 2.5)}
-                className="absolute left-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md"
+                onClick={() => handleMove('LEFT')}
+                className="absolute left-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 active:bg-orange-600 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400"
                 title="Turn Left (ArrowLeft)"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -571,8 +685,8 @@ export const IndoorNavigationPage: React.FC = () => {
 
               {/* RIGHT */}
               <button
-                onClick={() => locationProvider.moveDirection('RIGHT', 2.5)}
-                className="absolute right-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md"
+                onClick={() => handleMove('RIGHT')}
+                className="absolute right-1 p-2 rounded-xl bg-slate-800 hover:bg-orange-500 active:bg-orange-600 text-slate-300 hover:text-slate-950 active:scale-95 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400"
                 title="Turn Right (ArrowRight)"
               >
                 <ArrowRight className="w-5 h-5" />

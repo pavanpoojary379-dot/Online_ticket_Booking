@@ -235,3 +235,4 @@ print("✓ Scenario 7 Passed: Duplicate payment and booking attempts rejected wi
 print("\n=================================================================")
 print("ALL 7 BOOKING STATUS & SEAT HOLD FLOW TESTS PASSED 100%!")
 print("=================================================================")
+

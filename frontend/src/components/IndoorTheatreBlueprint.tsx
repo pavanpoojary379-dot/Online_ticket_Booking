@@ -283,13 +283,12 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
                   <circle
                     cx={seat.x}
                     cy={seat.y}
-                    r="4.2"
+                    r="4.0"
                     fill="none"
                     stroke="#f97316"
-                    strokeWidth="0.6"
+                    strokeWidth="0.7"
                     strokeOpacity="0.8"
-                    className="animate-ping origin-center"
-                    style={{ transformOrigin: `${seat.x}px ${seat.y}px` }}
+                    className="animate-pulse"
                   />
                 )}
 
@@ -369,44 +368,7 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
             </g>
           )}
 
-          {/* 8. Blue User Location Marker (Sonar Beacon) */}
-          <g className="user-location-marker transition-all duration-200">
-            {/* Outer Sonar Ring Animation */}
-            <circle
-              cx={currentX}
-              cy={currentY}
-              r="5.5"
-              fill="#0284c7"
-              fillOpacity="0.25"
-              className="animate-ping origin-center"
-              style={{ transformOrigin: `${currentX}px ${currentY}px` }}
-            />
-            {/* Middle Glow Ring */}
-            <circle
-              cx={currentX}
-              cy={currentY}
-              r="3.2"
-              fill="#0284c7"
-              fillOpacity="0.45"
-            />
-            {/* Solid Center Blue Dot */}
-            <circle
-              cx={currentX}
-              cy={currentY}
-              r="1.9"
-              fill="#38bdf8"
-              stroke="#ffffff"
-              strokeWidth="0.8"
-              filter="url(#sonarGlow)"
-            />
-            {/* Center Heading Arrow pointing along pathway */}
-            <polygon
-              points={`${currentX},${currentY - 1.3} ${currentX - 0.9},${currentY + 0.8} ${currentX + 0.9},${currentY + 0.8}`}
-              fill="#ffffff"
-            />
-          </g>
-
-          {/* 9. Entrance Marker */}
+          {/* 8. Entrance Marker */}
           {(() => {
             const entX = screenMap.entrance?.x ?? 50;
             const entY = screenMap.entrance?.y ?? 95;
@@ -440,7 +402,7 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
             );
           })()}
 
-          {/* 10. Emergency Exit Marker */}
+          {/* 9. Emergency Exit Marker */}
           {(() => {
             const exX = screenMap.exit?.x ?? 8;
             const exY = screenMap.exit?.y ?? 16;
@@ -473,7 +435,7 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
             );
           })()}
 
-          {/* 11. Interactive Checkpoint Dots */}
+          {/* 10. Interactive Checkpoint Dots */}
           {screenMap.checkpoints.map((cp) => (
             <g
               key={cp.id}
@@ -491,6 +453,42 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
               />
             </g>
           ))}
+
+          {/* 11. Topmost Blue User Location Marker (Sonar Beacon) */}
+          <g className="user-location-marker pointer-events-none transition-all duration-150 ease-out">
+            {/* Outer Pulsing Sonar Ring */}
+            <circle
+              cx={currentX}
+              cy={currentY}
+              r="5.5"
+              fill="#0284c7"
+              fillOpacity="0.25"
+              className="animate-pulse"
+            />
+            {/* Middle Glow Ring */}
+            <circle
+              cx={currentX}
+              cy={currentY}
+              r="3.4"
+              fill="#0ea5e9"
+              fillOpacity="0.45"
+            />
+            {/* High-Contrast Core Blue Dot */}
+            <circle
+              cx={currentX}
+              cy={currentY}
+              r="2.0"
+              fill="#38bdf8"
+              stroke="#ffffff"
+              strokeWidth="0.8"
+              filter="url(#sonarGlow)"
+            />
+            {/* Center Heading Pointer Arrow */}
+            <polygon
+              points={`${currentX},${currentY - 1.3} ${currentX - 0.9},${currentY + 0.8} ${currentX + 0.9},${currentY + 0.8}`}
+              fill="#ffffff"
+            />
+          </g>
         </svg>
       </div>
 
