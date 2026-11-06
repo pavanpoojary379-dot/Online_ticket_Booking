@@ -7,6 +7,7 @@ from pathlib import Path
 from app.database import engine, Base, SessionLocal
 from app.config import UPLOADS_DIR
 from app.seed_data import seed_database
+import app.models
 from app.routers import (
     auth,
     movies,
@@ -17,7 +18,8 @@ from app.routers import (
     tickets,
     coupons,
     admin,
-    recommendations
+    recommendations,
+    navigation
 )
 
 @asynccontextmanager
@@ -63,6 +65,7 @@ app.include_router(tickets.router)
 app.include_router(coupons.router)
 app.include_router(admin.router)
 app.include_router(recommendations.router)
+app.include_router(navigation.router)
 
 @app.get("/")
 def root():

@@ -262,7 +262,10 @@ def test_recommendation_endpoints():
         # ----------------------------------------------------
         # TEST 14: Manual seat selection continues to work
         # ----------------------------------------------------
-        avail_seat = db.query(Seat).filter(Seat.screen_id == show.screen_id, Seat.row_label == "A", Seat.seat_number == 1).first()
+        from app.services.booking_service import get_seat_layout_with_status
+        layout = get_seat_layout_with_status(db, show_id)
+        avail_seat_dict = next(s for s in layout if s["status"] == "AVAILABLE")
+        avail_seat = db.query(Seat).filter(Seat.id == avail_seat_dict["id"]).first()
         manual_hold = client.post(
             "/api/bookings/hold-seats",
             json={"show_id": show_id, "seat_ids": [avail_seat.id]},

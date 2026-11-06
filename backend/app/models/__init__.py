@@ -7,6 +7,7 @@ from app.models.seat import Seat
 from app.models.booking import Booking, BookingSeat, SeatLock
 from app.models.payment import Payment
 from app.models.coupon import Coupon
+from app.models.navigation import NavigationSession
 
 __all__ = [
     "User",
@@ -19,6 +20,7 @@ __all__ = [
     "BookingSeat",
     "SeatLock",
     "Payment",
-    "Coupon"
+    "Coupon",
+    "NavigationSession"
 ]
 

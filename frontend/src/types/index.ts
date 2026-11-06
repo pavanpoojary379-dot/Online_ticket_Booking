@@ -186,3 +186,121 @@ export interface AdminStats {
   revenue_by_movie: { movie_title: string; revenue: number; bookings_count: number }[];
   daily_analytics: { date: string; bookings: number; revenue: number }[];
 }
+
+// Indoor Seat Navigation Types
+export type NavigationState =
+  | 'ENTERING_AUDITORIUM'
+  | 'MOVING_TO_ROW'
+  | 'APPROACHING_ROW'
+  | 'ENTERED_TARGET_ROW'
+  | 'APPROACHING_SEAT'
+  | 'SEAT_REACHED';
+
+export interface NavigationBookingInfo {
+  booking_id: number;
+  booking_code: string;
+  movie_title: string;
+  movie_poster?: string;
+  theatre_name: string;
+  theatre_city: string;
+  screen_id: number;
+  screen_name: string;
+  screen_format: string;
+  show_time: string;
+  booked_seats: {
+    seat_id: number;
+    label: string;
+    row_label: string;
+    seat_number: number;
+    tier: string;
+    price: number;
+  }[];
+  default_seat_id: number;
+}
+
+export interface SeatCoordinateItem {
+  id: number;
+  row_label: string;
+  seat_number: number;
+  label: string;
+  tier: string;
+  x: number;
+  y: number;
+  is_accessible: boolean;
+  is_booked_by_user?: boolean;
+}
+
+export interface NavigationCheckpointItem {
+  id: string;
+  label: string;
+  description: string;
+  x: number;
+  y: number;
+  status: string;
+}
+
+export interface ScreenMapData {
+  screen_id: number;
+  screen_name: string;
+  screen_format: string;
+  theatre_name: string;
+  dimensions: { width: number; height: number };
+  screen_element: {
+    label: string;
+    x1: number;
+    x2: number;
+    y: number;
+    curvature: number;
+  };
+  entrance: {
+    label: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  exit: {
+    label: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  aisles: {
+    id: string;
+    name: string;
+    type: 'VERTICAL' | 'HORIZONTAL';
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    x1?: number;
+    x2?: number;
+    y1?: number;
+    y2?: number;
+  }[];
+  seats: SeatCoordinateItem[];
+  rows: string[];
+  row_positions: Record<string, number>;
+  checkpoints: NavigationCheckpointItem[];
+}
+
+export interface NavigationSessionData {
+  session_id: string;
+  booking_id: number;
+  show_id: number;
+  screen_id: number;
+  target_seat_id: number;
+  target_seat_label: string;
+  current_x: number;
+  current_y: number;
+  navigation_status: NavigationState;
+  status_message: string;
+  route: { x: number; y: number }[];
+  remaining_distance: number;
+  remaining_steps: number;
+  current_instruction: string;
+  positioning_source: string;
+  is_target_row_active: boolean;
+  is_seat_reached: boolean;
+}

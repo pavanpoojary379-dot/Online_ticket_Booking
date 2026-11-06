@@ -11,7 +11,10 @@ import {
   AdminStats,
   SeatRecommendationsResponse,
   ShowPreferencesResponse,
-  SeatRecommendationRequestParams
+  SeatRecommendationRequestParams,
+  NavigationBookingInfo,
+  ScreenMapData,
+  NavigationSessionData
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -228,6 +231,43 @@ export const adminApi = {
   },
   getAllPayments: async () => {
     const res = await api.get<Payment[]>('/admin/payments');
+    return res.data;
+  },
+};
+
+// Indoor Navigation API
+export const navigationApi = {
+  getBookingNavInfo: async (bookingId: number) => {
+    const res = await api.get<NavigationBookingInfo>(`/navigation/booking/${bookingId}`);
+    return res.data;
+  },
+  getScreenMap: async (screenId: number) => {
+    const res = await api.get<ScreenMapData>(`/navigation/screen/${screenId}/map`);
+    return res.data;
+  },
+  startSession: async (bookingId: number, targetSeatId?: number) => {
+    const res = await api.post<NavigationSessionData>('/navigation/session/start', {
+      booking_id: bookingId,
+      target_seat_id: targetSeatId,
+    });
+    return res.data;
+  },
+  getSession: async (sessionId: string) => {
+    const res = await api.get<NavigationSessionData>(`/navigation/session/${sessionId}`);
+    return res.data;
+  },
+  updateLocation: async (sessionId: string, x: number, y: number, source: string = 'SIMULATION') => {
+    const res = await api.patch<NavigationSessionData>(`/navigation/session/${sessionId}/location`, {
+      x,
+      y,
+      source,
+    });
+    return res.data;
+  },
+  completeSession: async (sessionId: string) => {
+    const res = await api.post<{ session_id: string; status: string; message: string; completed_at: string }>(
+      `/navigation/session/${sessionId}/complete`
+    );
     return res.data;
   },
 };

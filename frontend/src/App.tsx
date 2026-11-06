@@ -10,6 +10,7 @@ import { BookingSummaryPage } from './pages/BookingSummaryPage';
 import { PaymentPage } from './pages/PaymentPage';
 import { ConfirmationPage } from './pages/ConfirmationPage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
+import { IndoorNavigationPage } from './pages/IndoorNavigationPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/booking/payment/:bookingId" element={<PaymentPage />} />
             <Route path="/booking/confirmation/:bookingId" element={<ConfirmationPage />} />
             <Route path="/my-bookings" element={<MyBookingsPage />} />
+            <Route path="/navigation/:bookingId" element={<IndoorNavigationPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/admin" element={<AdminDashboardPage />} />

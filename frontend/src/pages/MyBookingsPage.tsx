@@ -246,6 +246,14 @@ export const MyBookingsPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2">
                       {!isCancelled && (
                         <>
+                          <Link
+                            to={`/navigation/${b.id}`}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/40 text-xs font-bold transition-all flex items-center space-x-1"
+                          >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Navigate to Seat</span>
+                          </Link>
+
                           <button
                             onClick={() => setSelectedTicketModal(b)}
                             className="px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-slate-950 border border-orange-500/30 text-xs font-bold transition-all flex items-center space-x-1"
@@ -329,15 +337,25 @@ export const MyBookingsPage: React.FC = () => {
               Seats: <b className="text-white">{selectedTicketModal.seats?.map((s) => s.seat_label).join(', ')}</b>
             </div>
 
-            <a
-              href={`/api/tickets/${selectedTicketModal.id}/download`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-slate-950 font-bold text-xs flex items-center justify-center space-x-1.5"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download Official PDF Ticket</span>
-            </a>
+            <div className="space-y-2 pt-2">
+              <Link
+                to={`/navigation/${selectedTicketModal.id}`}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-500/20"
+              >
+                <Compass className="w-4 h-4" />
+                <span>Navigate to My Seat</span>
+              </Link>
+
+              <a
+                href={`/api/tickets/${selectedTicketModal.id}/download`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center space-x-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download Official PDF Ticket</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

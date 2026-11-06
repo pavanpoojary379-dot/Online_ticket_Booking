@@ -34,7 +34,26 @@ A modern, responsive, and full-featured cinema ticketing web application designe
   Normalized $0$ to $100$, ranking the top 3 best combinations with detailed score breakdown pills and human-readable explanations.
 - **Instant Map Synchronization:** Recommended options glow in green on the interactive cinema grid. 1-click apply updates selection and flows into booking & payment.
 
-### 3. Pricing, Coupons & Checkout
+### 3. Smart Indoor Seat Navigation
+- **Interactive Theatre Blueprint:** Realistic top-view cinema auditorium SVG map generated dynamically from database screen and seat records. Includes curved glowing screen, rows, aisles, accessible seating, entrance, and emergency exit.
+- **Visual State System:**
+  - **Blue Sonar Marker:** Customer's real-time position.
+  - **Green Glow:** Target row highlighted when approached or entered.
+  - **Orange Beacon:** Customer's booked seat with pulsating target ring.
+  - **Suggested Pathway:** A* pathfinding polyline guiding the customer step-by-step from entrance to seat.
+- **Smart Row & Proximity Detection (State Machine):**
+  1. `ENTERING_AUDITORIUM` (At entrance)
+  2. `MOVING_TO_ROW` (Central/side aisles)
+  3. `APPROACHING_ROW` (Row turns glowing **Green**)
+  4. `ENTERED_TARGET_ROW` (Alert: *"You are in Row F. Find Seat 10."*)
+  5. `APPROACHING_SEAT` (Within ~2.5m)
+  6. `SEAT_REACHED` (Success celebration: *"You have reached your seat – F10. Enjoy your movie!"*)
+- **Positioning Abstraction & Simulation Mode:**
+  - `SimulationLocationProvider`: Interactive 4-way D-Pad (Up/Down/Left/Right) with collision detection (cannot walk over seats) and quick checkpoint jumps.
+  - `BLELocationProvider`: Clean architecture stub ready for native mobile iBeacon/Eddystone RSSI trilateration.
+- **Multimodal Alerts:** In-app toast banners, status cards, Web Notification API, and mobile Vibration API (`navigator.vibrate`) on milestone arrival.
+
+### 4. Pricing, Coupons & Checkout
 - **Itemized Pricing Breakdown:** Real-time subtotal in INR, per-seat convenience fee, and discounts.
 - **Verified Promo Codes:**
   - `CINE20`: 20% instant discount (Min order ₹400).
@@ -140,10 +159,13 @@ A modern, responsive, and full-featured cinema ticketing web application designe
 Run the full end-to-end integration and smart seat recommendation test suites:
 
 ```bash
-# 1. Test Smart Seat Recommendation System (All 14 Scenarios)
+# 1. Test Smart Indoor Seat Navigation (All 10 Scenarios)
+python backend/test_indoor_navigation.py
+
+# 2. Test Smart Seat Recommendation System (All 14 Scenarios)
 python backend/test_smart_recommendations.py
 
-# 2. Test Full 11-Step Cinema Booking Workflow
+# 3. Test Full 11-Step Cinema Booking Workflow
 python backend/test_e2e_flow.py
 ```
 

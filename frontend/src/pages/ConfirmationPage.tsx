@@ -10,7 +10,9 @@ import {
   QrCode,
   Share2,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Compass,
+  Navigation
 } from 'lucide-react';
 import { bookingsApi } from '../services/api';
 import { Booking } from '../types';
@@ -191,6 +193,14 @@ export const ConfirmationPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
+          <Link
+            to={`/navigation/${booking.id}`}
+            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2 animate-pulse"
+          >
+            <Compass className="w-4 h-4" />
+            <span>Navigate to My Seat</span>
+          </Link>
+
           <a
             href={downloadPdfUrl}
             target="_blank"
