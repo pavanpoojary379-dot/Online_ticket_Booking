@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Tag, Check, X, Shield, ArrowRight, ChevronLeft, Clock, Info } from 'lucide-react';
+import { Tag, Check, X, Shield, ArrowRight, ChevronLeft, Clock, Info, Film } from 'lucide-react';
 import { useBooking } from '../context/BookingContext';
 import { bookingsApi, couponsApi } from '../services/api';
 import { Navbar } from '../components/Navbar';
@@ -15,6 +15,9 @@ export const BookingSummaryPage: React.FC = () => {
     removeCoupon,
     setCurrentBooking,
     remainingSeconds,
+    isLockExpired,
+    isRestoringSession,
+    restoreBookingSession,
     totalSeatPrice,
   } = useBooking();
 
@@ -25,14 +28,64 @@ export const BookingSummaryPage: React.FC = () => {
 
   const navigate = useNavigate();
 
+  // If page was loaded directly or refreshed, trigger restoration if not already populated
+  useEffect(() => {
+    if (!selectedShow || selectedSeats.length === 0 || remainingSeconds <= 0) {
+      restoreBookingSession();
+    }
+  }, [restoreBookingSession]);
+
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen bg-[#090a0f] text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 className="text-lg font-bold text-white font-['Outfit']">Restoring Your Booking Session</h2>
+        <p className="text-xs text-slate-400 mt-1">Verifying seat reservations with cinema server...</p>
+      </div>
+    );
+  }
+
+  if (isLockExpired) {
+    return (
+      <div className="min-h-screen bg-[#090a0f] text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-[#0e1117] border border-orange-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto text-orange-400">
+            <Clock className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-black text-white font-['Outfit']">Seat Hold Expired</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Cinema seats are held temporarily for 5 minutes during checkout to ensure fair availability. Your hold has expired. Please re-select your seats to continue your reservation.
+          </p>
+          <button
+            onClick={() => navigate(selectedShow ? `/booking/seats/${selectedShow.id}` : '/')}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center space-x-2"
+          >
+            <span>Re-select Seats</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!selectedShow || selectedSeats.length === 0) {
     return (
       <div className="min-h-screen bg-[#090a0f] text-slate-100 flex flex-col items-center justify-center p-4">
-        <h2 className="text-xl font-bold mb-2">No Active Booking Session</h2>
-        <p className="text-xs text-slate-400 mb-4">Please select a movie and seats to continue.</p>
-        <Link to="/" className="px-4 py-2 bg-orange-500 text-slate-950 font-bold rounded-xl text-xs">
-          Browse Movies
-        </Link>
+        <div className="max-w-md w-full bg-[#0e1117] border border-slate-800 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
+            <Film className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-black text-white font-['Outfit']">No Active Booking Session</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Please select a movie and seats to continue with your cinema ticket reservation.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center py-3 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-orange-500/20 transition-all"
+          >
+            Browse Movies
+          </Link>
+        </div>
       </div>
     );
   }
@@ -59,6 +112,11 @@ export const BookingSummaryPage: React.FC = () => {
   };
 
   const handleProceedToPayment = async () => {
+    if (isLockExpired || remainingSeconds <= 0) {
+      alert('Your seat hold has expired. Please re-select your seats.');
+      if (selectedShow) navigate(`/booking/seats/${selectedShow.id}`);
+      return;
+    }
     setBookingLoading(true);
     try {
       const pendingBooking = await bookingsApi.createPending(

@@ -10,6 +10,8 @@ from app.models.show import Show
 from app.schemas.booking import (
     HoldSeatsRequest,
     ReleaseSeatsRequest,
+    VerifyLockRequest,
+    VerifyLockResponse,
     CreateBookingRequest,
     BookingOut,
     BookingSeatOut,
@@ -18,7 +20,12 @@ from app.schemas.booking import (
 from app.schemas.show import ShowOut
 from app.schemas.movie import MovieOut
 from app.schemas.theatre import TheatreOut
-from app.services.booking_service import hold_seats, release_seats, create_pending_booking
+from app.services.booking_service import (
+    hold_seats,
+    release_seats,
+    create_pending_booking,
+    verify_user_seat_locks
+)
 from app.utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
@@ -106,6 +113,17 @@ def api_release_seats(
     current_user: User = Depends(get_current_user)
 ):
     return release_seats(db, req.show_id, req.seat_ids, current_user.id)
+
+@router.post("/verify-lock", response_model=VerifyLockResponse)
+def api_verify_lock(
+    req: VerifyLockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Verifies that the requested seats are currently locked by the authenticated user and have not expired.
+    """
+    return verify_user_seat_locks(db, req.show_id, req.seat_ids, current_user.id)
 
 @router.post("/create-pending", response_model=BookingOut)
 def api_create_pending(

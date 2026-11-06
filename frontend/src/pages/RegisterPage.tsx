@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Film, Lock, Mail, User, Phone, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
@@ -14,6 +14,9 @@ export const RegisterPage: React.FC = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectPath = new URLSearchParams(location.search).get('redirect') || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +30,7 @@ export const RegisterPage: React.FC = () => {
         password,
       });
       login(res.access_token, res.user);
-      navigate('/');
+      navigate(redirectPath === 'booking-summary' || redirectPath === '/booking/summary' ? '/booking/summary' : redirectPath);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed');
     } finally {
@@ -140,7 +143,10 @@ export const RegisterPage: React.FC = () => {
 
           <div className="pt-2 text-center text-xs text-slate-400">
             Already registered?{' '}
-            <Link to="/login" className="text-orange-400 font-bold hover:underline">
+            <Link
+              to={redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : '/login'}
+              className="text-orange-400 font-bold hover:underline"
+            >
               Sign In Instead
             </Link>
           </div>

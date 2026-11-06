@@ -11,6 +11,17 @@ class ReleaseSeatsRequest(BaseModel):
     show_id: int
     seat_ids: List[int]
 
+class VerifyLockRequest(BaseModel):
+    show_id: int
+    seat_ids: List[int]
+
+class VerifyLockResponse(BaseModel):
+    is_locked_by_user: bool
+    expires_at: Optional[str] = None
+    remaining_seconds: int = 0
+    reason: Optional[str] = None
+    seat_ids: Optional[List[int]] = None
+
 class CreateBookingRequest(BaseModel):
     show_id: int
     seat_ids: List[int]

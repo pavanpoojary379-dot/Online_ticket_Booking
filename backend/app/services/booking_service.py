@@ -165,10 +165,46 @@ def release_seats(db: Session, show_id: int, seat_ids: List[int], user_id: int):
     db.commit()
     return {"message": "Seats released successfully"}
 
+def verify_user_seat_locks(db: Session, show_id: int, seat_ids: List[int], user_id: int) -> dict:
+    """
+    Checks if all requested seats are currently locked by the specified user and not expired.
+    Returns lock status, expiration time, and remaining seconds.
+    """
+    cleanup_expired_locks(db)
+
+    if not seat_ids:
+        return {"is_locked_by_user": False, "remaining_seconds": 0, "reason": "No seats specified."}
+
+    now = datetime.utcnow()
+    user_locks = db.query(SeatLock).filter(
+        SeatLock.show_id == show_id,
+        SeatLock.seat_id.in_(seat_ids),
+        SeatLock.user_id == user_id,
+        SeatLock.expires_at > now
+    ).all()
+
+    if len(user_locks) == len(seat_ids):
+        min_expires = min([lock.expires_at for lock in user_locks])
+        remaining = max(0, int((min_expires - now).total_seconds()))
+        return {
+            "is_locked_by_user": True,
+            "expires_at": min_expires.isoformat(),
+            "remaining_seconds": remaining,
+            "seat_ids": seat_ids,
+        }
+
+    return {
+        "is_locked_by_user": False,
+        "remaining_seconds": 0,
+        "reason": "Seat locks have expired or are held by another customer.",
+        "seat_ids": seat_ids,
+    }
+
 def create_pending_booking(db: Session, show_id: int, seat_ids: List[int], user_id: int, coupon_code: Optional[str] = None) -> Booking:
     """
-    Creates a PENDING booking record with calculated price, fees, and discounts.
+    Creates or updates a PENDING booking record with calculated price, fees, and discounts.
     Validates that seats are currently held by this user.
+    Prevents duplicate pending booking rows.
     """
     cleanup_expired_locks(db)
 
@@ -214,6 +250,41 @@ def create_pending_booking(db: Session, show_id: int, seat_ids: List[int], user_
             discount_amount = round((total_amount * coupon.discount_percent) / 100.0, 2)
 
     final_amount = round(total_amount + convenience_fee - discount_amount, 2)
+
+    # Check for existing pending booking for this user and show to prevent duplicates
+    existing_pending = db.query(Booking).filter(
+        Booking.show_id == show_id,
+        Booking.user_id == user_id,
+        Booking.status == "PENDING"
+    ).order_by(Booking.id.desc()).first()
+
+    if existing_pending:
+        existing_pending.total_amount = total_amount
+        existing_pending.convenience_fee = convenience_fee
+        existing_pending.discount_amount = discount_amount
+        existing_pending.final_amount = final_amount
+        existing_pending.coupon_code = coupon_code.upper().strip() if coupon_code else None
+
+        db.query(BookingSeat).filter(BookingSeat.booking_id == existing_pending.id).delete()
+        for s in seats:
+            price = show.silver_price
+            if s.tier == "GOLD":
+                price = show.gold_price
+            elif s.tier == "PLATINUM":
+                price = show.platinum_price
+
+            bs = BookingSeat(
+                booking_id=existing_pending.id,
+                seat_id=s.id,
+                tier=s.tier,
+                price=price
+            )
+            db.add(bs)
+
+        db.commit()
+        db.refresh(existing_pending)
+        return existing_pending
+
     booking_code = f"CB-{uuid.uuid4().hex[:8].upper()}"
 
     booking = Booking(

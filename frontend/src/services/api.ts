@@ -154,6 +154,16 @@ export const bookingsApi = {
     const res = await api.post('/bookings/release-seats', { show_id: showId, seat_ids: seatIds });
     return res.data;
   },
+  verifyLock: async (showId: number, seatIds: number[]) => {
+    const res = await api.post<{
+      is_locked_by_user: boolean;
+      expires_at?: string;
+      remaining_seconds: number;
+      reason?: string;
+      seat_ids?: number[];
+    }>('/bookings/verify-lock', { show_id: showId, seat_ids: seatIds });
+    return res.data;
+  },
   createPending: async (showId: number, seatIds: number[], couponCode?: string) => {
     const res = await api.post<Booking>('/bookings/create-pending', {
       show_id: showId,

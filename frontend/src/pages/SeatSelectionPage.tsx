@@ -74,7 +74,7 @@ export const SeatSelectionPage: React.FC = () => {
 
     if (!isAuthenticated) {
       // Prompt user to sign in, preserving booking context
-      navigate('/login?redirect=booking-summary');
+      navigate('/login?redirect=/booking/summary');
       return;
     }
 

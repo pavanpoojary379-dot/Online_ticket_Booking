@@ -101,3 +101,4 @@ class DemoClassroomPresetRequest(BaseModel):
     num_rows: int = 5
     seats_per_row: int = 6
     aisle_after_seat: int = 3
+
