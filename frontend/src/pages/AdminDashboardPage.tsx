@@ -17,7 +17,8 @@ import {
   BarChart3,
   Calendar,
   X,
-  RefreshCw
+  RefreshCw,
+  Building2
 } from 'lucide-react';
 import {
   BarChart,
@@ -35,6 +36,7 @@ import { AdminStats, Movie, Booking } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { TheatreLayoutEditor } from '../components/admin/TheatreLayoutEditor';
 
 export const AdminDashboardPage: React.FC = () => {
   const { user, isAdmin, isLoading } = useAuth();
@@ -44,7 +46,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'MOVIES' | 'BOOKINGS'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'MOVIES' | 'BOOKINGS' | 'THEATRE_LAYOUTS'>('OVERVIEW');
 
   // Add/Edit Movie Modal state
   const [showMovieModal, setShowMovieModal] = useState<boolean>(false);
@@ -319,6 +321,17 @@ export const AdminDashboardPage: React.FC = () => {
           >
             All Bookings ({bookings.length})
           </button>
+          <button
+            onClick={() => setActiveTab('THEATRE_LAYOUTS')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              activeTab === 'THEATRE_LAYOUTS'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Theatre Layout Manager</span>
+          </button>
         </div>
 
         {/* Tab 1: Overview & Recharts Analytics */}
@@ -551,6 +564,11 @@ export const AdminDashboardPage: React.FC = () => {
               </table>
             </div>
           </div>
+        )}
+
+        {/* Tab 4: Theatre Layout Manager */}
+        {activeTab === 'THEATRE_LAYOUTS' && (
+          <TheatreLayoutEditor />
         )}
 
       </main>

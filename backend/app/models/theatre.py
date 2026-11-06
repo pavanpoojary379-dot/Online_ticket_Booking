@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -10,6 +10,8 @@ class Theatre(Base):
     city = Column(String(100), index=True, nullable=False)
     address = Column(String(500), nullable=False)
     formats = Column(String(255), default="2D,3D,IMAX")  # comma-separated formats
+    is_demo = Column(Boolean, default=False, nullable=False)
+    description = Column(Text, nullable=True)
 
     screens = relationship("Screen", back_populates="theatre", cascade="all, delete-orphan")
     shows = relationship("Show", back_populates="theatre", cascade="all, delete-orphan")

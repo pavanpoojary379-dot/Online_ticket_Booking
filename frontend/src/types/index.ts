@@ -304,3 +304,72 @@ export interface NavigationSessionData {
   is_target_row_active: boolean;
   is_seat_reached: boolean;
 }
+
+// --------------------------------------------------------------------------
+// THEATRE LAYOUT MANAGER TYPES
+// --------------------------------------------------------------------------
+
+export interface ScreenBriefItem {
+  id: number;
+  screen_number: number;
+  name: string;
+  total_seats: number;
+  has_custom_layout: boolean;
+}
+
+export interface TheatreAdminItem {
+  id: number;
+  name: string;
+  city: string;
+  address: string;
+  formats: string;
+  is_demo: boolean;
+  description?: string;
+  screens_count: number;
+  screens: ScreenBriefItem[];
+}
+
+export interface CustomSeatLayoutItem {
+  row_label: string;
+  seat_number: number;
+  tier: SeatTier;
+  x?: number;
+  y?: number;
+  is_accessible?: boolean;
+}
+
+export interface ScreenLayoutConfig {
+  rows: string[];
+  seats_per_row: number;
+  aisle_after_seat: number;
+  side_aisles: boolean;
+  screen_position: 'FRONT' | 'BACK';
+  entrance_position: 'BACK_CENTER' | 'BACK_LEFT' | 'BACK_RIGHT' | 'FRONT_LEFT' | 'FRONT_RIGHT';
+  exit_position: string;
+  aisles?: any[];
+  custom_seats?: CustomSeatLayoutItem[];
+  row_positions?: Record<string, number>;
+  is_demo_preset?: boolean;
+  preset_name?: string;
+}
+
+export interface ScreenLayoutDetail {
+  screen_id: number;
+  screen_name: string;
+  screen_number: number;
+  theatre_id: number;
+  theatre_name: string;
+  is_demo: boolean;
+  total_seats: number;
+  layout_config: ScreenLayoutConfig | null;
+  seats: {
+    id: number;
+    row_label: string;
+    seat_number: number;
+    label: string;
+    tier: SeatTier;
+    is_booked: boolean;
+  }[];
+  booked_seats_count: number;
+}
+

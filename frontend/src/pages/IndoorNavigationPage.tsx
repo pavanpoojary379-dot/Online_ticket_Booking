@@ -635,3 +635,4 @@ export const IndoorNavigationPage: React.FC = () => {
     </div>
   );
 };
+

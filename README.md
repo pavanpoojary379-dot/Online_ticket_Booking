@@ -53,7 +53,30 @@ A modern, responsive, and full-featured cinema ticketing web application designe
   - `BLELocationProvider`: Clean architecture stub ready for native mobile iBeacon/Eddystone RSSI trilateration.
 - **Multimodal Alerts:** In-app toast banners, status cards, Web Notification API, and mobile Vibration API (`navigator.vibrate`) on milestone arrival.
 
-### 4. Pricing, Coupons & Checkout
+### 4. Admin Theatre Layout Manager & Physical Classroom Demos
+- **Classroom to Cinema Blueprint Conversion:** Convert any physical college classroom or seminar room into a digital cinema auditorium for demonstrating CineBook's Smart Indoor Seat Navigation.
+- **Interactive Visual Blueprint Builder:**
+  - Dynamic rows (add/remove rows, customizable labels such as A, B, C, D, E).
+  - Customizable chairs/seats per row (2 to 14 chairs).
+  - Walkable central aisle split (e.g. aisle after chair 3 for split between seats 3 and 4).
+  - Left & right side walking corridors and rear concourse.
+  - Interactive chair tier cycling (Silver → Gold → Platinum) and accessible seat toggling.
+  - Auditorium entrance placement (Rear Center, Rear Left, Rear Right) and emergency exit.
+  - Real-time SVG preview canvas with live coordinate calculations.
+- **1-Click College Demo Classroom Setup:**
+  - Instantly provisions **College Demo Theatre** (`is_demo = True`) with **Screen 1**.
+  - 5 rows (A, B, C, D, E), 6 chairs per row (30 seats total).
+  - Central aisle between chair 3 and chair 4.
+  - Pre-seeded active show so users can book Row C Seat 4 and navigate immediately.
+- **Navigation Engine Integration:**
+  - Dynamically feeds custom coordinates, rows, and aisle geometry into the A* pathfinding graph (`indoor_navigation_service.py`).
+  - Computes obstacle-free walking path from entrance door along the central aisle and turns into Row C for Seat 4.
+  - State machine triggers `"You are in Row C. Find Seat 4."` upon entering the row lane and `"You have reached your seat – C4. Enjoy your movie!"` at the chair.
+- **Data Protection & Validation:**
+  - Rejects duplicate row labels and overlapping chairs.
+  - Protects active reservations: unbooked seats can be modified/rearranged, but booked seats cannot be removed.
+
+### 5. Pricing, Coupons & Checkout
 - **Itemized Pricing Breakdown:** Real-time subtotal in INR, per-seat convenience fee, and discounts.
 - **Verified Promo Codes:**
   - `CINE20`: 20% instant discount (Min order ₹400).
@@ -156,16 +179,19 @@ A modern, responsive, and full-featured cinema ticketing web application designe
 
 ### Step 3: Running Tests
 
-Run the full end-to-end integration and smart seat recommendation test suites:
+Run the full end-to-end integration and feature test suites:
 
 ```bash
-# 1. Test Smart Indoor Seat Navigation (All 10 Scenarios)
+# 1. Test Theatre Layout Manager & Classroom Demonstration (All 6 Scenarios)
+python backend/test_theatre_layout.py
+
+# 2. Test Smart Indoor Seat Navigation (All 10 Scenarios)
 python backend/test_indoor_navigation.py
 
-# 2. Test Smart Seat Recommendation System (All 14 Scenarios)
+# 3. Test Smart Seat Recommendation System (All 14 Scenarios)
 python backend/test_smart_recommendations.py
 
-# 3. Test Full 11-Step Cinema Booking Workflow
+# 4. Test Full 11-Step Cinema Booking Workflow
 python backend/test_e2e_flow.py
 ```
 

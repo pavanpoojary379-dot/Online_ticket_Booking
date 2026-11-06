@@ -83,16 +83,56 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
           />
 
           {/* 2. Walkable Aisle Surfaces */}
-          {/* Central Aisle */}
-          <rect x="46" y="16" width="8" height="73" fill="url(#aisleGrid)" rx="1.5" />
-          {/* Left Aisle */}
-          <rect x="6" y="16" width="6" height="73" fill="url(#aisleGrid)" rx="1" />
-          {/* Right Aisle */}
-          <rect x="88" y="16" width="6" height="73" fill="url(#aisleGrid)" rx="1" />
-          {/* Front Cross Aisle */}
-          <rect x="6" y="13" width="88" height="6" fill="url(#aisleGrid)" rx="1" />
-          {/* Rear Cross Concourse */}
-          <rect x="6" y="86" width="88" height="7" fill="url(#aisleGrid)" rx="1.5" />
+          {screenMap.aisles && screenMap.aisles.length > 0 ? (
+            screenMap.aisles.map((aisle) => {
+              if (aisle.type === 'VERTICAL') {
+                const w = aisle.width || 8;
+                const ax = aisle.x !== undefined ? aisle.x - w / 2 : 46;
+                const y1 = aisle.y1 !== undefined ? aisle.y1 : 16;
+                const y2 = aisle.y2 !== undefined ? aisle.y2 : 89;
+                return (
+                  <rect
+                    key={aisle.id}
+                    x={ax}
+                    y={y1}
+                    width={w}
+                    height={Math.max(1, y2 - y1)}
+                    fill="url(#aisleGrid)"
+                    rx="1.5"
+                  />
+                );
+              } else {
+                const h = aisle.height || 6;
+                const ay = aisle.y !== undefined ? aisle.y - h / 2 : 86;
+                const x1 = aisle.x1 !== undefined ? aisle.x1 : 6;
+                const x2 = aisle.x2 !== undefined ? aisle.x2 : 94;
+                return (
+                  <rect
+                    key={aisle.id}
+                    x={x1}
+                    y={ay}
+                    width={Math.max(1, x2 - x1)}
+                    height={h}
+                    fill="url(#aisleGrid)"
+                    rx="1.5"
+                  />
+                );
+              }
+            })
+          ) : (
+            <>
+              {/* Central Aisle */}
+              <rect x="46" y="16" width="8" height="73" fill="url(#aisleGrid)" rx="1.5" />
+              {/* Left Aisle */}
+              <rect x="6" y="16" width="6" height="73" fill="url(#aisleGrid)" rx="1" />
+              {/* Right Aisle */}
+              <rect x="88" y="16" width="6" height="73" fill="url(#aisleGrid)" rx="1" />
+              {/* Front Cross Aisle */}
+              <rect x="6" y="13" width="88" height="6" fill="url(#aisleGrid)" rx="1" />
+              {/* Rear Cross Concourse */}
+              <rect x="6" y="86" width="88" height="7" fill="url(#aisleGrid)" rx="1.5" />
+            </>
+          )}
 
           {/* Aisle Guide Centerlines */}
           <line x1="50" y1="16" x2="50" y2="89" stroke="#334155" strokeWidth="0.3" strokeDasharray="1 1.5" />
@@ -124,7 +164,7 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
               fontWeight="900"
               letterSpacing="0.4"
             >
-              CINEMA SCREEN
+              {screenMap.screen_element?.label ? screenMap.screen_element.label.toUpperCase() : 'CINEMA SCREEN'}
             </text>
           </g>
 
@@ -366,54 +406,72 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
             />
           </g>
 
-          {/* 9. Entrance Marker (Bottom) */}
-          <g className="auditorium-entrance">
-            <rect
-              x="42"
-              y="93"
-              width="16"
-              height="4"
-              rx="1.5"
-              fill="#0f172a"
-              stroke="#f97316"
-              strokeWidth="0.6"
-            />
-            <text
-              x="50"
-              y="95.8"
-              textAnchor="middle"
-              fill="#f97316"
-              fontSize="2.1"
-              fontWeight="900"
-              letterSpacing="0.3"
-            >
-              ▼ MAIN ENTRANCE
-            </text>
-          </g>
+          {/* 9. Entrance Marker */}
+          {(() => {
+            const entX = screenMap.entrance?.x ?? 50;
+            const entY = screenMap.entrance?.y ?? 95;
+            const entW = screenMap.entrance?.width ?? 16;
+            const entH = screenMap.entrance?.height ?? 4;
+            const entLabel = screenMap.entrance?.label || 'MAIN ENTRANCE';
+            return (
+              <g className="auditorium-entrance">
+                <rect
+                  x={entX - entW / 2}
+                  y={entY - entH / 2}
+                  width={entW}
+                  height={entH}
+                  rx="1.5"
+                  fill="#0f172a"
+                  stroke="#f97316"
+                  strokeWidth="0.6"
+                />
+                <text
+                  x={entX}
+                  y={entY + 0.8}
+                  textAnchor="middle"
+                  fill="#f97316"
+                  fontSize="2.0"
+                  fontWeight="900"
+                  letterSpacing="0.2"
+                >
+                  ▼ {entLabel.toUpperCase()}
+                </text>
+              </g>
+            );
+          })()}
 
-          {/* 10. Emergency Exit Marker (Front Left) */}
-          <g className="emergency-exit">
-            <rect
-              x="5"
-              y="11"
-              width="11"
-              height="3.5"
-              rx="1"
-              fill="#064e3b"
-              stroke="#10b981"
-              strokeWidth="0.4"
-            />
-            <text
-              x="10.5"
-              y="13.4"
-              textAnchor="middle"
-              fill="#34d399"
-              fontSize="1.7"
-              fontWeight="bold"
-            >
-              EXIT ◄
-            </text>
-          </g>
+          {/* 10. Emergency Exit Marker */}
+          {(() => {
+            const exX = screenMap.exit?.x ?? 8;
+            const exY = screenMap.exit?.y ?? 16;
+            const exW = screenMap.exit?.width ?? 11;
+            const exH = screenMap.exit?.height ?? 3.5;
+            const exLabel = screenMap.exit?.label || 'EXIT ◄';
+            return (
+              <g className="emergency-exit">
+                <rect
+                  x={exX - exW / 2}
+                  y={exY - exH / 2}
+                  width={exW}
+                  height={exH}
+                  rx="1"
+                  fill="#064e3b"
+                  stroke="#10b981"
+                  strokeWidth="0.4"
+                />
+                <text
+                  x={exX}
+                  y={exY + 0.8}
+                  textAnchor="middle"
+                  fill="#34d399"
+                  fontSize="1.6"
+                  fontWeight="bold"
+                >
+                  {exLabel.toUpperCase()}
+                </text>
+              </g>
+            );
+          })()}
 
           {/* 11. Interactive Checkpoint Dots */}
           {screenMap.checkpoints.map((cp) => (
@@ -463,3 +521,4 @@ export const IndoorTheatreBlueprint: React.FC<IndoorTheatreBlueprintProps> = ({
     </div>
   );
 };
+

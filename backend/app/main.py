@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from app.database import engine, Base, SessionLocal
+from app.database import engine, Base, SessionLocal, ensure_schema_migrations
 from app.config import UPLOADS_DIR
 from app.seed_data import seed_database
 import app.models
@@ -26,7 +26,9 @@ from app.routers import (
 async def lifespan(app: FastAPI):
     # 1. Create all database tables
     Base.metadata.create_all(bind=engine)
-    # 2. Seed initial sample data if empty
+    # 2. Ensure schema migrations for existing DB tables
+    ensure_schema_migrations()
+    # 3. Seed initial sample data if empty
     db = SessionLocal()
     try:
         seed_database(db)

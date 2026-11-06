@@ -36,3 +36,4 @@ export interface ILocationProvider {
   /** Whether backed by active physical radio hardware */
   isRealHardware(): boolean;
 }
+

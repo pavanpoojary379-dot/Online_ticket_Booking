@@ -74,3 +74,4 @@ export class BLELocationProvider implements ILocationProvider {
     this.listeners.forEach((listener) => listener(loc));
   }
 }
+

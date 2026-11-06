@@ -14,7 +14,10 @@ import {
   SeatRecommendationRequestParams,
   NavigationBookingInfo,
   ScreenMapData,
-  NavigationSessionData
+  NavigationSessionData,
+  TheatreAdminItem,
+  ScreenLayoutDetail,
+  ScreenLayoutConfig
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -231,6 +234,52 @@ export const adminApi = {
   },
   getAllPayments: async () => {
     const res = await api.get<Payment[]>('/admin/payments');
+    return res.data;
+  },
+  // Theatre Layout Manager
+  getTheatres: async () => {
+    const res = await api.get<TheatreAdminItem[]>('/admin/theatres');
+    return res.data;
+  },
+  createTheatre: async (data: {
+    name: string;
+    city: string;
+    address: string;
+    formats?: string;
+    is_demo?: boolean;
+    description?: string;
+  }) => {
+    const res = await api.post<any>('/admin/theatres', data);
+    return res.data;
+  },
+  updateTheatre: async (theatreId: number, data: any) => {
+    const res = await api.put<any>(`/admin/theatres/${theatreId}`, data);
+    return res.data;
+  },
+  deleteTheatre: async (theatreId: number) => {
+    const res = await api.delete<{ message: string }>(`/admin/theatres/${theatreId}`);
+    return res.data;
+  },
+  createScreen: async (theatreId: number, screenNumber: number, name: string, totalSeats: number = 30) => {
+    const res = await api.post<any>(
+      `/admin/theatres/${theatreId}/screens?screen_number=${screenNumber}&name=${encodeURIComponent(name)}&total_seats=${totalSeats}`
+    );
+    return res.data;
+  },
+  getScreenLayout: async (screenId: number) => {
+    const res = await api.get<ScreenLayoutDetail>(`/admin/screens/${screenId}/layout`);
+    return res.data;
+  },
+  saveScreenLayout: async (screenId: number, data: { screen_name?: string; layout: ScreenLayoutConfig }) => {
+    const res = await api.put<any>(`/admin/screens/${screenId}/layout`, data);
+    return res.data;
+  },
+  previewLayoutGeometry: async (screenId: number, layout: ScreenLayoutConfig) => {
+    const res = await api.post<any>(`/admin/screens/${screenId}/preview`, layout);
+    return res.data;
+  },
+  setupCollegeDemoClassroom: async (data?: any) => {
+    const res = await api.post<any>('/admin/theatres/demo-classroom', data || {});
     return res.data;
   },
 };

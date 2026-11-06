@@ -1,6 +1,7 @@
 import math
 import heapq
 import uuid
+import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, Set
 from sqlalchemy.orm import Session
@@ -25,13 +26,14 @@ SCREEN_BOUNDS = {"width": 100.0, "height": 100.0}
 
 # Proximity thresholds
 THRESHOLD_SEAT_REACHED = 3.5          # Within ~1.2 meters of seat
-THRESHOLD_APPROACHING_SEAT = 7.0      # Within ~2.5 meters of seat
+THRESHOLD_APPROACHING_SEAT = 5.0      # Within ~1.8 meters of seat
 THRESHOLD_ENTERED_ROW_Y = 3.0         # Vertically inside the row lane
 THRESHOLD_APPROACHING_ROW_Y = 7.5     # Within 1-2 row distances of target row
 
 def generate_screen_blueprint(db: Session, screen_id: int, booked_seat_ids: Optional[Set[int]] = None) -> ScreenMapResponse:
     """
-    Generates a dynamic 2D top-view cinema blueprint from the database screen and seat records.
+    Generates a dynamic 2D top-view cinema blueprint from the database screen and seat records,
+    prioritizing custom layout configurations (e.g. for seminar rooms and classrooms).
     """
     screen = db.query(Screen).filter(Screen.id == screen_id).first()
     if not screen:
@@ -41,7 +43,89 @@ def generate_screen_blueprint(db: Session, screen_id: int, booked_seat_ids: Opti
     if not seats:
         raise HTTPException(status_code=404, detail="No seats found for this screen.")
 
-    # Unique rows sorted (e.g. ['A', 'B', 'C', 'D', 'E', 'F'])
+    user_booked_set = booked_seat_ids or set()
+
+    # Check for custom layout configuration (e.g. classroom demonstration)
+    custom_cfg = None
+    if screen.layout_config:
+        try:
+            custom_cfg = json.loads(screen.layout_config)
+        except Exception:
+            custom_cfg = None
+
+    if custom_cfg and "custom_seats" in custom_cfg:
+        custom_lookup = {
+            (cs["row_label"], cs["seat_number"]): cs
+            for cs in custom_cfg["custom_seats"]
+        }
+        row_positions = custom_cfg.get("row_positions") or {}
+        row_labels = custom_cfg.get("rows") or sorted(list({s.row_label for s in seats}))
+        aisles = custom_cfg.get("aisles") or []
+        entrance = custom_cfg.get("entrance") or {
+            "label": "Auditorium Main Entrance",
+            "x": 50.0,
+            "y": 95.0,
+            "width": 12.0,
+            "height": 4.0,
+        }
+        exit_elem = custom_cfg.get("exit") or {
+            "label": "Emergency Exit",
+            "x": 8.0,
+            "y": 16.0,
+            "width": 8.0,
+            "height": 4.0,
+        }
+        screen_element = custom_cfg.get("screen_element") or {
+            "label": f"{screen.name} - Screen",
+            "x1": 15.0,
+            "x2": 85.0,
+            "y": 7.0,
+            "curvature": 25.0,
+        }
+        checkpoints = custom_cfg.get("checkpoints") or []
+
+        seat_coords: List[SeatCoordinate] = []
+        for s in seats:
+            cs = custom_lookup.get((s.row_label, s.seat_number))
+            if cs:
+                x_val = cs["x"]
+                y_val = cs["y"]
+                is_acc = cs.get("is_accessible", False)
+            else:
+                x_val = 50.0
+                y_val = row_positions.get(s.row_label, 50.0)
+                is_acc = False
+
+            coord = SeatCoordinate(
+                id=s.id,
+                row_label=s.row_label,
+                seat_number=s.seat_number,
+                label=f"{s.row_label}{s.seat_number}",
+                tier=s.tier,
+                x=round(x_val, 2),
+                y=round(y_val, 2),
+                is_accessible=is_acc,
+                is_booked_by_user=(s.id in user_booked_set),
+            )
+            seat_coords.append(coord)
+
+        return ScreenMapResponse(
+            screen_id=screen.id,
+            screen_name=screen.name,
+            screen_format="Classroom Layout" if (screen.theatre and screen.theatre.is_demo) else ("IMAX Laser" if "IMAX" in screen.name else "Dolby Atmos"),
+            theatre_name=screen.theatre.name if screen.theatre else "CineBook Cinemas",
+            dimensions=SCREEN_BOUNDS,
+            screen_element=screen_element,
+            entrance=entrance,
+            exit=exit_elem,
+            aisles=aisles,
+            seats=seat_coords,
+            rows=row_labels,
+            row_positions=row_positions,
+            checkpoints=checkpoints,
+        )
+
+    # Standard / Default Cinema Blueprint Generation
     row_labels = sorted(list({s.row_label for s in seats}))
     num_rows = len(row_labels)
 
@@ -56,19 +140,20 @@ def generate_screen_blueprint(db: Session, screen_id: int, booked_seat_ids: Opti
 
     # Calculate seat horizontal positions
     seat_coords: List[SeatCoordinate] = []
-    user_booked_set = booked_seat_ids or set()
+    max_seat_num = max([s.seat_number for s in seats], default=10)
+    split_point = max(1, max_seat_num // 2)
 
     for s in seats:
         y_val = row_positions[s.row_label]
-        # Standard cinema row split: seats 1-5 left wing, seats 6-10 right wing
-        if s.seat_number <= 5:
-            # Left wing: x from 14.0 to 44.0
-            x_val = 14.0 + (s.seat_number - 1) * ((44.0 - 14.0) / 4.0)
+        if s.seat_number <= split_point:
+            # Left wing
+            x_val = 14.0 + (s.seat_number - 1) * ((44.0 - 14.0) / max(1, split_point - 1))
         else:
-            # Right wing: x from 56.0 to 86.0
-            x_val = 56.0 + (s.seat_number - 6) * ((86.0 - 56.0) / 4.0)
+            # Right wing
+            remaining = max(1, max_seat_num - split_point - 1)
+            x_val = 56.0 + (s.seat_number - split_point - 1) * ((86.0 - 56.0) / remaining)
 
-        is_acc = s.row_label in ["A", "F"] and s.seat_number in [1, 10]
+        is_acc = s.row_label in [row_labels[0], row_labels[-1]] and s.seat_number in [1, max_seat_num]
         coord = SeatCoordinate(
             id=s.id,
             row_label=s.row_label,
@@ -131,8 +216,6 @@ def generate_screen_blueprint(db: Session, screen_id: int, booked_seat_ids: Opti
         },
     ]
 
-    # Checkpoints for demonstration simulation
-    last_row = row_labels[-1] if row_labels else "F"
     checkpoints = [
         {
             "id": "entrance",
@@ -195,17 +278,47 @@ def generate_screen_blueprint(db: Session, screen_id: int, booked_seat_ids: Opti
     )
 
 
-def build_walkable_graph(row_positions: Dict[str, float]) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[str]]]:
+def get_screen_layout_params(screen: Screen) -> Tuple[int, float, Tuple[float, float]]:
+    """
+    Returns (aisle_split_seat, aisle_x, (entrance_x, entrance_y)) for the given screen.
+    Defaults to 50.0 center, split at half seat count, entrance at (50.0, 95.0).
+    """
+    if screen.layout_config:
+        try:
+            cfg = json.loads(screen.layout_config)
+            split = cfg.get("aisle_after_seat", 5)
+            entrance_data = cfg.get("entrance", {})
+            ent_x = entrance_data.get("x", 50.0)
+            ent_y = entrance_data.get("y", 95.0)
+            aisles = cfg.get("aisles", [])
+            aisle_x = 50.0
+            for a in aisles:
+                if a.get("id") == "central_aisle" and a.get("x") is not None:
+                    aisle_x = float(a["x"])
+                    break
+            return int(split), aisle_x, (float(ent_x), float(ent_y))
+        except Exception:
+            pass
+
+    max_seat = max([s.seat_number for s in screen.seats], default=10)
+    return max(1, max_seat // 2), 50.0, (50.0, 95.0)
+
+
+def build_walkable_graph(
+    row_positions: Dict[str, float],
+    aisle_x: float = 50.0,
+    entrance_pos: Tuple[float, float] = (50.0, 95.0)
+) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[str]]]:
     """
     Builds an aisle waypoint graph for A* navigation pathfinding.
     Nodes are walkable intersections; edges are accessible corridors.
     """
     nodes: Dict[str, Tuple[float, float]] = {
-        "entrance": (50.0, 95.0),
-        "rear_center": (50.0, 89.0),
+        "entrance": entrance_pos,
+        "rear_center": (aisle_x, 89.0),
         "rear_left": (8.0, 89.0),
         "rear_right": (92.0, 89.0),
-        "front_center": (50.0, 16.0),
+        "front_center": (aisle_x, 16.0),
         "front_left": (8.0, 16.0),
         "front_right": (92.0, 16.0),
     }
@@ -235,11 +348,11 @@ def build_walkable_graph(row_positions: Dict[str, float]) -> Tuple[Dict[str, Tup
         entry_left = f"entry_left_{r}"
         entry_right = f"entry_right_{r}"
 
-        nodes[node_c] = (50.0, y)
+        nodes[node_c] = (aisle_x, y)
         nodes[node_l] = (8.0, y)
         nodes[node_r] = (92.0, y)
-        nodes[entry_left] = (45.0, y)
-        nodes[entry_right] = (55.0, y)
+        nodes[entry_left] = (aisle_x - 5.0, y)
+        nodes[entry_right] = (aisle_x + 5.0, y)
 
         # Initialize lists
         for n in [node_c, node_l, node_r, entry_left, entry_right]:
@@ -280,12 +393,15 @@ def build_walkable_graph(row_positions: Dict[str, float]) -> Tuple[Dict[str, Tup
 def calculate_astar_route(
     start: Tuple[float, float],
     target_seat: Dict[str, Any],
-    row_positions: Dict[str, float]
+    row_positions: Dict[str, float],
+    aisle_split_seat: int = 5,
+    aisle_x: float = 50.0,
+    entrance_pos: Tuple[float, float] = (50.0, 95.0)
 ) -> Tuple[List[Dict[str, float]], float, List[str]]:
     """
     Computes the shortest obstacle-free route from current position to target seat using A*.
     """
-    nodes, edges = build_walkable_graph(row_positions)
+    nodes, edges = build_walkable_graph(row_positions, aisle_x=aisle_x, entrance_pos=entrance_pos)
 
     # 1. Connect start point to nearest aisle node
     best_start_node = None
@@ -299,7 +415,7 @@ def calculate_astar_route(
     # 2. Identify target row entry node
     row_char = target_seat["row_label"]
     seat_num = target_seat["seat_number"]
-    target_entry_node = f"entry_left_{row_char}" if seat_num <= 5 else f"entry_right_{row_char}"
+    target_entry_node = f"entry_left_{row_char}" if seat_num <= aisle_split_seat else f"entry_right_{row_char}"
     if target_entry_node not in nodes:
         target_entry_node = f"c_{row_char}" if f"c_{row_char}" in nodes else "rear_center"
 
@@ -359,8 +475,7 @@ def calculate_astar_route(
 
     # Generate turn-by-turn directional instructions
     instructions = []
-    y_diff = target_seat["y"] - start[1]
-    is_left = target_seat["seat_number"] <= 5
+    is_left = target_seat["seat_number"] <= aisle_split_seat
 
     if abs(start[1] - target_seat["y"]) > 10.0:
         instructions.append("Walk along the Central Aisle towards the screen.")
@@ -378,7 +493,9 @@ def evaluate_navigation_state(
     current_x: float,
     current_y: float,
     target_seat: Dict[str, Any],
-    row_positions: Dict[str, float]
+    row_positions: Dict[str, float],
+    aisle_split_seat: int = 5,
+    aisle_x: float = 50.0
 ) -> Tuple[str, str, bool, bool]:
     """
     Evaluates current position against target seat and row to determine state machine status.
@@ -413,7 +530,7 @@ def evaluate_navigation_state(
 
     # State 4: ENTERED_TARGET_ROW
     # User is vertically aligned with the target row and has entered the seating aisle
-    in_seating_lane = (seat_num <= 5 and current_x <= 48.0) or (seat_num > 5 and current_x >= 52.0)
+    in_seating_lane = (seat_num <= aisle_split_seat and current_x <= (aisle_x - 2.0)) or (seat_num > aisle_split_seat and current_x >= (aisle_x + 2.0))
     if y_diff_to_row <= THRESHOLD_ENTERED_ROW_Y and in_seating_lane:
         return (
             "ENTERED_TARGET_ROW",
@@ -567,11 +684,17 @@ def start_or_resume_session(
     target_coord = next(s for s in screen_map.seats if s.id == selected_target_id)
     target_dict = target_coord.model_dump()
 
+    screen_obj = db.query(Screen).filter(Screen.id == booking_info.screen_id).first()
+    split_seat, aisle_x, ent_pos = get_screen_layout_params(screen_obj) if screen_obj else (5, 50.0, (50.0, 95.0))
+
     # Route & State
     route, dist_units, instructions = calculate_astar_route(
         start=(session.current_x, session.current_y),
         target_seat=target_dict,
         row_positions=screen_map.row_positions,
+        aisle_split_seat=split_seat,
+        aisle_x=aisle_x,
+        entrance_pos=ent_pos,
     )
 
     status_str, message_str, is_row_active, is_reached = evaluate_navigation_state(
@@ -579,6 +702,8 @@ def start_or_resume_session(
         current_y=session.current_y,
         target_seat=target_dict,
         row_positions=screen_map.row_positions,
+        aisle_split_seat=split_seat,
+        aisle_x=aisle_x,
     )
 
     session.navigation_status = status_str
@@ -640,11 +765,17 @@ def update_session_location(
 
     target_dict = target_coord.model_dump()
 
+    screen_obj = db.query(Screen).filter(Screen.id == session.screen_id).first()
+    split_seat, aisle_x, ent_pos = get_screen_layout_params(screen_obj) if screen_obj else (5, 50.0, (50.0, 95.0))
+
     # Calculate real-time route
     route, dist_units, instructions = calculate_astar_route(
         start=(clamped_x, clamped_y),
         target_seat=target_dict,
         row_positions=screen_map.row_positions,
+        aisle_split_seat=split_seat,
+        aisle_x=aisle_x,
+        entrance_pos=ent_pos,
     )
 
     # Evaluate dynamic status
@@ -653,6 +784,8 @@ def update_session_location(
         current_y=clamped_y,
         target_seat=target_dict,
         row_positions=screen_map.row_positions,
+        aisle_split_seat=split_seat,
+        aisle_x=aisle_x,
     )
 
     session.navigation_status = status_str

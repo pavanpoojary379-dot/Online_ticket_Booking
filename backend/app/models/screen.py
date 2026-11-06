@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -10,6 +10,7 @@ class Screen(Base):
     screen_number = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
     total_seats = Column(Integer, default=60)
+    layout_config = Column(Text, nullable=True)  # JSON configuration for custom classroom/auditorium layout
 
     theatre = relationship("Theatre", back_populates="screens")
     seats = relationship("Seat", back_populates="screen", cascade="all, delete-orphan")
